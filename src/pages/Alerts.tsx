@@ -2,74 +2,95 @@ import React, { useState, useEffect } from 'react';
 import { AlertTriangle, CheckCircle, XCircle, Clock, Filter } from 'lucide-react';
 import { Alert } from '../types';
 import { format } from 'date-fns';
+import { supabase } from '../lib/supabase';
 
 const Alerts: React.FC = () => {
+  const [user, setUser] = useState<any>(null);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [filter, setFilter] = useState<'all' | 'active' | 'dismissed'>('all');
   const [severityFilter, setSeverityFilter] = useState<'all' | 'high' | 'medium' | 'low'>('all');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+    };
+    getUser();
+  }, []);
+
+  useEffect(() => {
+    if (!user?.id) return;
     const fetchAlerts = async () => {
       setLoading(true);
       try {
-        // Simulate API call with sample alerts
-        await new Promise(resolve => setTimeout(resolve, 800));
-        
-        const sampleAlerts: Alert[] = [
-          {
-            id: 'alert-001',
-            type: 'roas-drop',
-            title: 'ROAS Drop Alert',
-            message: 'Accessories Bundle campaign ROAS dropped 35% to 2.1x in the last 3 days. Consider pausing or optimizing.',
-            severity: 'high',
-            status: 'active',
-            createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
-            actionable: true,
-          },
-          {
-            id: 'alert-002',
-            type: 'low-stock',
-            title: 'Low Stock Alert',
-            message: 'Smart Watch (PROD-002) has only 8 units left with active campaigns spending $180/day.',
-            severity: 'high',
-            status: 'active',
-            createdAt: new Date(Date.now() - 4 * 60 * 60 * 1000), // 4 hours ago
-            actionable: true,
-          },
-          {
-            id: 'alert-003',
-            type: 'refund-spike',
-            title: 'Refund Spike Alert',
-            message: 'Refund rate increased to 8.2% (normal: 3.1%) in the last 48 hours. Check product quality issues.',
-            severity: 'medium',
-            status: 'active',
-            createdAt: new Date(Date.now() - 6 * 60 * 60 * 1000), // 6 hours ago
-            actionable: false,
-          },
-          {
-            id: 'alert-004',
-            type: 'campaign-performance',
-            title: 'Campaign Performance',
-            message: 'Black Friday Prep campaign performance improved after budget adjustment. ROAS: 2.8x → 3.4x',
-            severity: 'low',
-            status: 'dismissed',
-            createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000), // 1 day ago
-            actionable: false,
-          },
-          {
-            id: 'alert-005',
-            type: 'low-stock',
-            title: 'Out of Stock Alert',
-            message: 'Bluetooth Speaker (PROD-004) is completely out of stock. Paused related campaigns automatically.',
-            severity: 'medium',
-            status: 'resolved',
-            createdAt: new Date(Date.now() - 12 * 60 * 60 * 1000), // 12 hours ago
-            actionable: false,
-          },
-        ];
-        
-        setAlerts(sampleAlerts);
+        // Fetch campaign alerts from database
+        const { data: campaignAlerts, error: campaignError } = await supabase
+          .from('campaign_alerts')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
+
+        if (campaignError) {
+          throw campaignError;
+        }
+
+        // Fetch low stock alerts from products
+        const { data: products, error: productsError } = await supabase
+          .from('shopify_products')
+          .select('*')
+          .eq('user_id', user.id)
+          .lte('stock_quantity', 10);
+
+        if (productsError) {
+          console.warn('Failed to fetch product alerts:', productsError);
+        }
+
+        // Convert to Alert format
+        const allAlerts: Alert[] = [];
+
+        // Add campaign alerts
+        campaignAlerts?.forEach(alert => {
+          allAlerts.push({
+            id: alert.id,
+            type: alert.alert_type as any,
+            title: getAlertTitle(alert.alert_type),
+            message: alert.message,
+            severity: alert.severity as any,
+            status: alert.status as any,
+            createdAt: new Date(alert.created_at),
+            actionable: alert.alert_type === 'roas_drop' || alert.alert_type === 'zero_conversions',
+          });
+        });
+
+        // Add stock alerts
+        products?.forEach(product => {
+          if (product.stock_quantity === 0) {
+            allAlerts.push({
+              id: `stock-${product.id}`,
+              type: 'low-stock',
+              title: 'Out of Stock Alert',
+              message: `${product.name} (${product.sku}) is completely out of stock.`,
+              severity: 'high',
+              status: 'active',
+              createdAt: new Date(product.last_updated),
+              actionable: false,
+            });
+          } else if (product.stock_quantity < 10) {
+            allAlerts.push({
+              id: `stock-${product.id}`,
+              type: 'low-stock',
+              title: 'Low Stock Alert',
+              message: `${product.name} (${product.sku}) has only ${product.stock_quantity} units left.`,
+              severity: product.stock_quantity < 5 ? 'high' : 'medium',
+              status: 'active',
+              createdAt: new Date(product.last_updated),
+              actionable: false,
+            });
+          }
+        });
+
+        setAlerts(allAlerts);
       } catch (error) {
         console.error('Error fetching alerts:', error);
       } finally {
@@ -78,7 +99,20 @@ const Alerts: React.FC = () => {
     };
 
     fetchAlerts();
-  }, []);
+  }, [user?.id]);
+
+  const getAlertTitle = (alertType: string) => {
+    switch (alertType) {
+      case 'roas_drop':
+        return 'ROAS Drop Alert';
+      case 'zero_conversions':
+        return 'Zero Conversions Alert';
+      case 'high_spend':
+        return 'High Spend Alert';
+      default:
+        return 'Campaign Alert';
+    }
+  };
 
   const filteredAlerts = alerts.filter(alert => {
     if (filter !== 'all' && alert.status !== filter) return false;
@@ -88,18 +122,36 @@ const Alerts: React.FC = () => {
 
   const handleAction = async (alertId: string, action: 'approve' | 'dismiss') => {
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      setAlerts(prev => 
-        prev.map(alert => 
-          alert.id === alertId 
+      if (action === 'approve') {
+        // For campaign alerts, try to pause the campaign
+        const alert = alerts.find(a => a.id === alertId);
+        if (alert && (alert.type === 'roas-drop' || alert.type === 'zero_conversions')) {
+          // Extract campaign ID from alert (would need to be stored in alert data)
+          // For now, just mark as resolved
+          await supabase
+            .from('campaign_alerts')
+            .update({ status: 'resolved', resolved_at: new Date().toISOString() })
+            .eq('id', alertId);
+        }
+      } else {
+        // Dismiss alert
+        await supabase
+          .from('campaign_alerts')
+          .update({ status: 'dismissed', resolved_at: new Date().toISOString() })
+          .eq('id', alertId);
+      }
+
+      // Update local state
+      setAlerts(prev =>
+        prev.map(alert =>
+          alert.id === alertId
             ? { ...alert, status: action === 'approve' ? 'resolved' : 'dismissed' }
             : alert
         )
       );
     } catch (error) {
       console.error('Error updating alert:', error);
+      alert('Failed to update alert. Please try again.');
     }
   };
 
@@ -206,7 +258,9 @@ const Alerts: React.FC = () => {
           <div className="text-center py-12 bg-white rounded-lg border border-gray-200">
             <AlertTriangle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">No alerts found</h3>
-            <p className="text-gray-600">All systems are running smoothly</p>
+            <p className="text-gray-600">
+              {user?.id ? 'All systems are running smoothly' : 'Please sign in to view alerts'}
+            </p>
           </div>
         ) : (
           filteredAlerts.map((alert) => (
