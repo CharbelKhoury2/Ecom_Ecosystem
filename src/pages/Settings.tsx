@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Settings as SettingsIcon, CheckCircle, XCircle, Smartphone, Slack, RefreshCw } from 'lucide-react';
-import { useShopifyConnection } from '../hooks/useShopify';
+import { useShopifyConnection, useMetaConnection } from '../hooks/useShopify';
 import { supabase } from '../lib/supabase';
 import { useEffect } from 'react';
 
@@ -10,10 +10,17 @@ const Settings: React.FC = () => {
     storeUrl: '',
     accessToken: '',
   });
+  const [metaForm, setMetaForm] = useState({
+    adAccountId: '',
+    accessToken: '',
+  });
   const [connecting, setConnecting] = useState(false);
+  const [metaConnecting, setMetaConnecting] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [metaSyncing, setMetaSyncing] = useState(false);
   
   const { connection, connect, syncData, refresh } = useShopifyConnection(user?.id);
+  const { connection: metaConnection, connect: metaConnect, syncCampaigns, refresh: metaRefresh } = useMetaConnection(user?.id);
 
   useEffect(() => {
     const getUser = async () => {
@@ -29,6 +36,11 @@ const Settings: React.FC = () => {
     }
   }, [connection.storeUrl]);
 
+  useEffect(() => {
+    if (metaConnection.adAccountId) {
+      setMetaForm(prev => ({ ...prev, adAccountId: metaConnection.adAccountId }));
+    }
+  }, [metaConnection.adAccountId]);
   const [notifications, setNotifications] = useState({
     whatsappNumber: '',
     slackWebhook: '',
@@ -61,6 +73,27 @@ const Settings: React.FC = () => {
     }
   };
 
+  const handleMetaConnect = async () => {
+    if (!metaForm.adAccountId || !metaForm.accessToken) {
+      alert('Please fill in both Ad Account ID and Access Token');
+      return;
+    }
+
+    setMetaConnecting(true);
+    try {
+      const result = await metaConnect(metaForm.adAccountId, metaForm.accessToken);
+      if (result.success) {
+        alert('Successfully connected to Meta Ads!');
+        setMetaForm(prev => ({ ...prev, accessToken: '' })); // Clear token for security
+      } else {
+        alert(`Connection failed: ${result.error}`);
+      }
+    } catch (error) {
+      alert('Connection failed: Network error');
+    } finally {
+      setMetaConnecting(false);
+    }
+  };
   const handleSyncData = async () => {
     setSyncing(true);
     try {
@@ -77,6 +110,21 @@ const Settings: React.FC = () => {
     }
   };
 
+  const handleMetaSync = async () => {
+    setMetaSyncing(true);
+    try {
+      const result = await syncCampaigns(7);
+      if (result.success) {
+        alert(`Successfully synced ${result.campaignsProcessed} campaign records from ${result.uniqueCampaigns} campaigns!`);
+      } else {
+        alert(`Sync failed: ${result.error}`);
+      }
+    } catch (error) {
+      alert('Sync failed: Network error');
+    } finally {
+      setMetaSyncing(false);
+    }
+  };
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'connected':
@@ -211,20 +259,38 @@ const Settings: React.FC = () => {
                 <div>
                   <h3 className="text-base font-medium text-gray-900">Meta Ads</h3>
                   <div className="flex items-center space-x-2">
-                    {getStatusIcon('disconnected')}
+                    {getStatusIcon(metaConnection.connected ? 'connected' : 'disconnected')}
                     <span className="text-sm text-gray-600">
-                      {getStatusText('disconnected')}
+                      {getStatusText(metaConnection.connected ? 'connected' : 'disconnected')}
                     </span>
+                    {metaConnection.connected && metaConnection.connectedAt && (
+                      <span className="text-xs text-gray-500">
+                        • Connected {new Date(metaConnection.connectedAt).toLocaleDateString()}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
               
-              <button
-                disabled={true}
-                className="px-4 py-2 bg-gray-400 text-white rounded-lg cursor-not-allowed transition-colors text-sm"
-              >
-                Coming Soon
-              </button>
+              <div className="flex space-x-2">
+                {metaConnection.connected && (
+                  <button
+                    onClick={handleMetaSync}
+                    disabled={metaSyncing}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition-colors text-sm"
+                  >
+                    <RefreshCw className={`h-4 w-4 mr-2 inline ${metaSyncing ? 'animate-spin' : ''}`} />
+                    {metaSyncing ? 'Syncing...' : 'Sync Campaigns'}
+                  </button>
+                )}
+                <button
+                  onClick={metaConnection.connected ? metaRefresh : handleMetaConnect}
+                  disabled={metaConnecting || metaConnection.loading}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition-colors text-sm"
+                >
+                  {metaConnecting ? 'Connecting...' : metaConnection.connected ? 'Test Connection' : 'Connect'}
+                </button>
+              </div>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -234,10 +300,11 @@ const Settings: React.FC = () => {
                 </label>
                 <input
                   type="text"
-                  value=""
+                  value={metaForm.adAccountId}
+                  onChange={(e) => setMetaForm(prev => ({ ...prev, adAccountId: e.target.value }))}
                   className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="act_1234567890"
-                  disabled={true}
+                  disabled={metaConnection.connected}
                 />
               </div>
               
@@ -247,13 +314,26 @@ const Settings: React.FC = () => {
                 </label>
                 <input
                   type="password"
-                  value=""
+                  value={metaForm.accessToken}
+                  onChange={(e) => setMetaForm(prev => ({ ...prev, accessToken: e.target.value }))}
                   className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Enter your access token"
-                  disabled={true}
+                  placeholder={metaConnection.connected ? "••••••••••••••••" : "Enter your access token"}
+                  disabled={metaConnection.connected}
                 />
               </div>
             </div>
+            
+            {!metaConnection.connected && (
+              <div className="mt-4 p-4 bg-blue-50 rounded-lg">
+                <h4 className="text-sm font-medium text-blue-900 mb-2">How to get your Meta Ads credentials:</h4>
+                <ol className="text-sm text-blue-800 space-y-1">
+                  <li>1. Go to Facebook Business Manager → Business Settings</li>
+                  <li>2. Under "Users" → "System Users" → Create a system user</li>
+                  <li>3. Generate access token with ads_read permissions</li>
+                  <li>4. Find your Ad Account ID in Ads Manager (format: act_1234567890)</li>
+                </ol>
+              </div>
+            )}
           </div>
         </div>
       </div>
