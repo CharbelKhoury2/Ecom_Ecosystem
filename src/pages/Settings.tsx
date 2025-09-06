@@ -151,14 +151,14 @@ const Settings: React.FC = () => {
     <div className="p-6 space-y-8">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
-        <p className="text-gray-600 mt-1">Configure integrations and notification preferences</p>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Settings</h1>
+        <p className="text-gray-600 dark:text-gray-400 mt-1">Configure integrations and notification preferences</p>
       </div>
 
       {/* API Integrations */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-medium text-gray-900">API Integrations</h2>
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+          <h2 className="text-lg font-medium text-gray-900 dark:text-white">API Integrations</h2>
         </div>
         
         <div className="p-6 space-y-8">
@@ -166,18 +166,18 @@ const Settings: React.FC = () => {
           <div>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                  <span className="text-green-600 font-bold">S</span>
+                <div className="w-10 h-10 bg-green-100 dark:bg-green-900/20 rounded-lg flex items-center justify-center">
+                  <span className="text-green-600 dark:text-green-400 font-bold">S</span>
                 </div>
                 <div>
-                  <h3 className="text-base font-medium text-gray-900">Shopify</h3>
+                  <h3 className="text-base font-medium text-gray-900 dark:text-white">Shopify</h3>
                   <div className="flex items-center space-x-2">
                     {getStatusIcon(connection.connected ? 'connected' : 'disconnected')}
-                    <span className="text-sm text-gray-600">
+                    <span className="text-sm text-gray-600 dark:text-gray-400">
                       {getStatusText(connection.connected ? 'connected' : 'disconnected')}
                     </span>
                     {connection.connected && connection.connectedAt && (
-                      <span className="text-xs text-gray-500">
+                      <span className="text-xs text-gray-500 dark:text-gray-500">
                         • Connected {new Date(connection.connectedAt).toLocaleDateString()}
                       </span>
                     )}
@@ -208,28 +208,28 @@ const Settings: React.FC = () => {
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Store URL
                 </label>
                 <input
                   type="text"
                   value={shopifyForm.storeUrl}
                   onChange={(e) => setShopifyForm(prev => ({ ...prev, storeUrl: e.target.value }))}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="mystore.myshopify.com"
                   disabled={connection.connected}
                 />
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Admin API Access Token
                 </label>
                 <input
                   type="password"
                   value={shopifyForm.accessToken}
                   onChange={(e) => setShopifyForm(prev => ({ ...prev, accessToken: e.target.value }))}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder={connection.connected ? "••••••••••••••••" : "Enter your Admin API access token"}
                   disabled={connection.connected}
                 />
@@ -237,9 +237,9 @@ const Settings: React.FC = () => {
             </div>
             
             {!connection.connected && (
-              <div className="mt-4 p-4 bg-blue-50 rounded-lg">
-                <h4 className="text-sm font-medium text-blue-900 mb-2">How to get your Shopify credentials:</h4>
-                <ol className="text-sm text-blue-800 space-y-1">
+              <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                <h4 className="text-sm font-medium text-blue-900 dark:text-blue-200 mb-2">How to get your Shopify credentials:</h4>
+                <ol className="text-sm text-blue-800 dark:text-blue-300 space-y-1">
                   <li>1. Go to your Shopify admin → Settings → Apps and sales channels</li>
                   <li>2. Click "Develop apps" → "Create an app"</li>
                   <li>3. Configure Admin API access scopes: read_orders, read_products, read_inventory</li>
@@ -253,18 +253,18 @@ const Settings: React.FC = () => {
           <div>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                  <span className="text-blue-600 font-bold">M</span>
+                <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/20 rounded-lg flex items-center justify-center">
+                  <span className="text-blue-600 dark:text-blue-400 font-bold">M</span>
                 </div>
                 <div>
-                  <h3 className="text-base font-medium text-gray-900">Meta Ads</h3>
+                  <h3 className="text-base font-medium text-gray-900 dark:text-white">Meta Ads</h3>
                   <div className="flex items-center space-x-2">
                     {getStatusIcon(metaConnection.connected ? 'connected' : 'disconnected')}
-                    <span className="text-sm text-gray-600">
+                    <span className="text-sm text-gray-600 dark:text-gray-400">
                       {getStatusText(metaConnection.connected ? 'connected' : 'disconnected')}
                     </span>
                     {metaConnection.connected && metaConnection.connectedAt && (
-                      <span className="text-xs text-gray-500">
+                      <span className="text-xs text-gray-500 dark:text-gray-500">
                         • Connected {new Date(metaConnection.connectedAt).toLocaleDateString()}
                       </span>
                     )}
@@ -295,28 +295,28 @@ const Settings: React.FC = () => {
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Ad Account ID
                 </label>
                 <input
                   type="text"
                   value={metaForm.adAccountId}
                   onChange={(e) => setMetaForm(prev => ({ ...prev, adAccountId: e.target.value }))}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="act_1234567890"
                   disabled={metaConnection.connected}
                 />
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Access Token
                 </label>
                 <input
                   type="password"
                   value={metaForm.accessToken}
                   onChange={(e) => setMetaForm(prev => ({ ...prev, accessToken: e.target.value }))}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder={metaConnection.connected ? "••••••••••••••••" : "Enter your access token"}
                   disabled={metaConnection.connected}
                 />
@@ -324,9 +324,9 @@ const Settings: React.FC = () => {
             </div>
             
             {!metaConnection.connected && (
-              <div className="mt-4 p-4 bg-blue-50 rounded-lg">
-                <h4 className="text-sm font-medium text-blue-900 mb-2">How to get your Meta Ads credentials:</h4>
-                <ol className="text-sm text-blue-800 space-y-1">
+              <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                <h4 className="text-sm font-medium text-blue-900 dark:text-blue-200 mb-2">How to get your Meta Ads credentials:</h4>
+                <ol className="text-sm text-blue-800 dark:text-blue-300 space-y-1">
                   <li>1. Go to Facebook Business Manager → Business Settings</li>
                   <li>2. Under "Users" → "System Users" → Create a system user</li>
                   <li>3. Generate access token with ads_read permissions</li>
@@ -339,9 +339,9 @@ const Settings: React.FC = () => {
       </div>
 
       {/* Notification Settings */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-medium text-gray-900">Notifications</h2>
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+          <h2 className="text-lg font-medium text-gray-900 dark:text-white">Notifications</h2>
         </div>
         
         <div className="p-6 space-y-6">
@@ -349,18 +349,18 @@ const Settings: React.FC = () => {
           <div>
             <div className="flex items-center space-x-3 mb-3">
               <Smartphone className="h-5 w-5 text-green-500" />
-              <h3 className="text-base font-medium text-gray-900">WhatsApp</h3>
+              <h3 className="text-base font-medium text-gray-900 dark:text-white">WhatsApp</h3>
             </div>
             
             <div className="max-w-md">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Phone Number
               </label>
               <input
                 type="tel"
                 value={notifications.whatsappNumber}
                 onChange={(e) => setNotifications(prev => ({ ...prev, whatsappNumber: e.target.value }))}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="+1 (555) 123-4567"
               />
             </div>
@@ -370,18 +370,18 @@ const Settings: React.FC = () => {
           <div>
             <div className="flex items-center space-x-3 mb-3">
               <Slack className="h-5 w-5 text-purple-500" />
-              <h3 className="text-base font-medium text-gray-900">Slack</h3>
+              <h3 className="text-base font-medium text-gray-900 dark:text-white">Slack</h3>
             </div>
             
             <div className="max-w-md">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Webhook URL
               </label>
               <input
                 type="url"
                 value={notifications.slackWebhook}
                 onChange={(e) => setNotifications(prev => ({ ...prev, slackWebhook: e.target.value }))}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="https://hooks.slack.com/services/..."
               />
             </div>
@@ -390,15 +390,15 @@ const Settings: React.FC = () => {
       </div>
 
       {/* Alert Thresholds */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-medium text-gray-900">Alert Thresholds</h2>
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+          <h2 className="text-lg font-medium text-gray-900 dark:text-white">Alert Thresholds</h2>
         </div>
         
         <div className="p-6 space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 ROAS Drop Threshold (%)
               </label>
               <input
@@ -408,12 +408,12 @@ const Settings: React.FC = () => {
                   ...prev,
                   alertThresholds: { ...prev.alertThresholds, roasDropPercent: Number(e.target.value) }
                 }))}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Low Stock Threshold (units)
               </label>
               <input
@@ -423,12 +423,12 @@ const Settings: React.FC = () => {
                   ...prev,
                   alertThresholds: { ...prev.alertThresholds, lowStockUnits: Number(e.target.value) }
                 }))}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Refund Spike Threshold (%)
               </label>
               <input
@@ -438,7 +438,7 @@ const Settings: React.FC = () => {
                   ...prev,
                   alertThresholds: { ...prev.alertThresholds, refundSpikePercent: Number(e.target.value) }
                 }))}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
           </div>

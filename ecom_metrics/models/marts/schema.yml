@@ -1,0 +1,265 @@
+version: 2
+
+models:
+  - name: fct_sales_daily
+    description: "Daily sales fact table with comprehensive order and revenue metrics"
+    columns:
+      - name: sales_daily_key
+        description: "Unique surrogate key for each workspace-date combination"
+        tests:
+          - unique
+          - not_null
+      - name: workspace_id
+        description: "Workspace identifier"
+        tests:
+          - not_null
+      - name: date_key
+        description: "Date key for the sales data"
+        tests:
+          - not_null
+      - name: order_date
+        description: "Date of the sales data"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: "'2020-01-01'"
+              max_value: "current_date + interval '1 day'"
+      - name: total_orders
+        description: "Total number of orders"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              inclusive: true
+      - name: gross_revenue
+        description: "Total gross revenue"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              inclusive: true
+      - name: net_revenue
+        description: "Net revenue after cancellations and refunds"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              inclusive: true
+      - name: total_cogs
+        description: "Total cost of goods sold"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              inclusive: true
+      - name: gross_profit
+        description: "Gross profit (revenue - COGS)"
+        tests:
+          - not_null
+      - name: unique_customers
+        description: "Number of unique customers"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              inclusive: true
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - workspace_id
+            - date_key
+      # Custom test to ensure net_revenue <= gross_revenue
+      - dbt_utils.expression_is_true:
+          expression: "net_revenue <= gross_revenue"
+      # Custom test to ensure gross_profit = net_revenue - total_cogs
+      - dbt_utils.expression_is_true:
+          expression: "abs(gross_profit - (net_revenue - total_cogs)) < 0.01"
+
+  - name: fct_ad_spend_daily
+    description: "Daily advertising spend fact table with campaign performance metrics"
+    columns:
+      - name: ad_spend_daily_key
+        description: "Unique surrogate key for each workspace-date combination"
+        tests:
+          - unique
+          - not_null
+      - name: workspace_id
+        description: "Workspace identifier"
+        tests:
+          - not_null
+      - name: date_key
+        description: "Date key for the ad spend data"
+        tests:
+          - not_null
+      - name: campaign_date
+        description: "Date of the campaign data"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: "'2020-01-01'"
+              max_value: "current_date + interval '1 day'"
+      - name: total_ad_spend
+        description: "Total advertising spend"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              inclusive: true
+      - name: total_impressions
+        description: "Total impressions"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              inclusive: true
+      - name: total_clicks
+        description: "Total clicks"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              inclusive: true
+      - name: total_conversions
+        description: "Total conversions"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              inclusive: true
+      - name: overall_roas
+        description: "Overall return on ad spend"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              inclusive: true
+      - name: overall_ctr
+        description: "Overall click-through rate"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 100
+              inclusive: true
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - workspace_id
+            - date_key
+      # Custom test to ensure clicks <= impressions
+      - dbt_utils.expression_is_true:
+          expression: "total_clicks <= total_impressions"
+      # Custom test to ensure conversions <= clicks
+      - dbt_utils.expression_is_true:
+          expression: "total_conversions <= total_clicks"
+
+  - name: mtr_true_pnl
+    description: "True P&L metrics combining sales and advertising data for comprehensive profitability analysis"
+    columns:
+      - name: true_pnl_key
+        description: "Unique surrogate key for each workspace-date combination"
+        tests:
+          - unique
+          - not_null
+      - name: workspace_id
+        description: "Workspace identifier"
+        tests:
+          - not_null
+      - name: date_key
+        description: "Date key for the P&L data"
+        tests:
+          - not_null
+      - name: date
+        description: "Date of the P&L data"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: "'2020-01-01'"
+              max_value: "current_date + interval '1 day'"
+      - name: revenue
+        description: "Total revenue"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              inclusive: true
+      - name: ad_spend
+        description: "Total advertising spend"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              inclusive: true
+      - name: cogs
+        description: "Cost of goods sold"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              inclusive: true
+      - name: gross_profit
+        description: "Gross profit (revenue - ad_spend - cogs)"
+        tests:
+          - not_null
+      - name: true_roas
+        description: "True return on ad spend (revenue / ad_spend)"
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              inclusive: true
+      - name: gross_profit_margin_percent
+        description: "Gross profit margin percentage"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: -1000
+              max_value: 100
+              inclusive: true
+      - name: ad_spend_percent_of_revenue
+        description: "Ad spend as percentage of revenue"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              inclusive: true
+      - name: customer_acquisition_cost
+        description: "Cost to acquire each customer"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              inclusive: true
+      - name: revenue_7d_avg
+        description: "7-day rolling average revenue"
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              inclusive: true
+      - name: gross_profit_7d_avg
+        description: "7-day rolling average gross profit"
+        tests:
+          - not_null
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - workspace_id
+            - date_key
+      # Custom test to ensure gross_profit = revenue - ad_spend - cogs
+      - dbt_utils.expression_is_true:
+          expression: "abs(gross_profit - (revenue - ad_spend - cogs)) < 0.01"
+      # Custom test to ensure ROAS calculation is correct when ad_spend > 0
+      - dbt_utils.expression_is_true:
+          expression: "(ad_spend = 0) OR (abs(true_roas - (revenue / ad_spend)) < 0.01)"
+      # Custom test to ensure profit margin calculation is correct when revenue > 0
+      - dbt_utils.expression_is_true:
+          expression: "(revenue = 0) OR (abs(gross_profit_margin_percent - (gross_profit / revenue * 100)) < 0.01)"
+      # Data quality test to flag unusual ROAS values
+      - dbt_utils.expression_is_true:
+          expression: "true_roas IS NULL OR true_roas <= 50"  # Flag ROAS > 50 as potentially erroneous
+          config:
+            severity: warn
+      # Data quality test to flag unusual profit margins
+      - dbt_utils.expression_is_true:
+          expression: "gross_profit_margin_percent >= -500 AND gross_profit_margin_percent <= 200"  # Flag extreme margins
+          config:
+            severity: warn

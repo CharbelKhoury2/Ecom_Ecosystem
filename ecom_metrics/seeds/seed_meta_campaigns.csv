@@ -1,0 +1,6 @@
+id,campaign_id,name,status,daily_budget,total_spend,impressions,clicks,conversions,revenue,roas,ctr,cpc,workspace_id,date,created_at,updated_at
+CAMP-001,META-001,Premium T-Shirt Campaign,active,50.00,45.00,10000,200,8,125.00,2.78,2.00,0.23,test_workspace,2024-01-15,2024-01-15 08:00:00,2024-01-15 08:00:00
+CAMP-002,META-002,Designer Jeans Campaign,active,75.00,70.00,15000,300,12,235.00,3.36,2.00,0.23,test_workspace,2024-01-15,2024-01-15 08:00:00,2024-01-15 08:00:00
+CAMP-003,META-003,Sneakers Campaign,active,60.00,55.00,12000,250,10,180.00,3.27,2.08,0.22,test_workspace,2024-01-16,2024-01-16 08:00:00,2024-01-16 08:00:00
+CAMP-004,META-004,Luxury Watch Campaign,active,100.00,95.00,20000,400,15,345.00,3.63,2.00,0.24,test_workspace,2024-01-16,2024-01-16 08:00:00,2024-01-16 08:00:00
+CAMP-005,META-005,Casual Wear Campaign,active,40.00,35.00,8000,180,7,97.50,2.79,2.25,0.19,test_workspace,2024-01-17,2024-01-17 08:00:00,2024-01-17 08:00:00

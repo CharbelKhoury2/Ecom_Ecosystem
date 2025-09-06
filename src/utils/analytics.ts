@@ -7,10 +7,30 @@ export interface PnLCalculation {
   contributionMargin: number;
 }
 
+interface OrderData {
+  total: number;
+  refunds?: number;
+  sku: string;
+  quantity: number;
+}
+
+interface CampaignData {
+  spend: number;
+  name: string;
+  roas: number;
+}
+
+interface ProductData {
+  sku: string;
+  costPerItem: number;
+  name: string;
+  stockLevel: number;
+}
+
 export const calculateTruePnL = (
-  orderData: any[],
-  campaignData: any[],
-  productData: any[]
+  orderData: OrderData[],
+  campaignData: CampaignData[],
+  productData: ProductData[]
 ): PnLCalculation => {
   // Calculate Revenue (sum of order totals minus refunds)
   const revenue = orderData.reduce((sum, order) => {
@@ -56,8 +76,8 @@ export const calculateTruePnL = (
 export const generateAlerts = (
   currentMetrics: PnLCalculation,
   previousMetrics: PnLCalculation,
-  productData: any[],
-  campaignData: any[]
+  productData: ProductData[],
+  campaignData: CampaignData[]
 ) => {
   const alerts = [];
 

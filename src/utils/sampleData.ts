@@ -181,14 +181,6 @@ export const getSampleDashboardData = () => {
     return daysDiff > 7 && daysDiff <= 14;
   });
 
-  // Calculate current metrics
-  const currentRevenue = last7Days.reduce((sum, order) => sum + order.revenue, 0);
-  const currentAdSpend = last7DaysCampaigns.reduce((sum, campaign) => sum + campaign.spend, 0);
-  const currentCogs = last7Days.reduce((sum, order) => sum + order.cogs, 0) + (currentRevenue * 0.05); // Include shipping
-  const currentGrossProfit = currentRevenue - currentAdSpend - currentCogs;
-  const currentRoas = currentAdSpend > 0 ? currentRevenue / currentAdSpend : 0;
-  const currentMargin = currentRevenue > 0 ? (currentGrossProfit / currentRevenue) * 100 : 0;
-
   // Calculate previous metrics
   const previousRevenue = previous7Days.reduce((sum, order) => sum + order.revenue, 0);
   const previousAdSpend = previous7DaysCampaigns.reduce((sum, campaign) => sum + campaign.spend, 0);

@@ -1,85 +1,438 @@
 import { supabase } from '../../lib/supabase';
+import { buildCopilotContext, CopilotContext } from '../../utils/copilotContext';
+import { 
+  checkRateLimit, 
+  getCachedContext, 
+  setCachedContext, 
+  getRateLimitHeaders,
+  RateLimitError 
+} from '../../utils/cacheAndRateLimit';
+import {
+  trackAPIUsage,
+  checkUsageLimits,
+  getUsageHeaders,
+  UsageLimitError
+} from '../../utils/apiUsageTracking';
 
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || 'AIzaSyDH3IfcmNb2htWqJ2g0bAV7VeC1oKaHfhI';
+const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent';
 
 export async function POST(request: Request) {
   try {
-    const { query, userId } = await request.json();
+    const { 
+      workspace_id, 
+      user_query, 
+      conversation_context, 
+      enhanced_features 
+    } = await request.json();
 
-    if (!query || !userId) {
+    if (!workspace_id || !user_query) {
       return new Response(
-        JSON.stringify({ error: 'Missing query or userId' }),
+        JSON.stringify({ error: 'Missing workspace_id or user_query' }),
         { status: 400, headers: { 'Content-Type': 'application/json' } }
       );
     }
 
-    // Fetch current store data for context
-    const storeData = await fetchStoreContext(userId);
+    // Check rate limiting
+    try {
+      checkRateLimit(workspace_id);
+    } catch (error) {
+      if (error instanceof RateLimitError) {
+        const headers = {
+          'Content-Type': 'application/json',
+          ...getRateLimitHeaders(workspace_id)
+        };
+        return new Response(
+          JSON.stringify({ 
+            error: 'Rate limit exceeded. Please try again later.',
+            resetTime: error.resetTime
+          }),
+          { status: 429, headers }
+        );
+      }
+      throw error;
+    }
 
-    // Generate AI response
-    const aiResponse = await generateAIResponse(query, storeData);
+    // Check usage limits
+    try {
+      await checkUsageLimits(workspace_id);
+    } catch (error) {
+      if (error instanceof UsageLimitError) {
+        const headers = {
+          'Content-Type': 'application/json',
+          'X-Usage-Limit-Current': error.current_usage.toString(),
+          'X-Usage-Limit-Max': error.limit.toString(),
+          'X-Usage-Limit-Reset': Math.ceil(error.reset_time / 1000).toString()
+        };
+        return new Response(
+          JSON.stringify({ 
+            error: 'Daily usage limit exceeded. Please try again tomorrow.',
+            current_usage: error.current_usage,
+            limit: error.limit,
+            reset_time: error.reset_time
+          }),
+          { status: 429, headers }
+        );
+      }
+      throw error;
+    }
+
+    // Try to get cached context first
+    let context = getCachedContext(workspace_id);
+    
+    if (!context) {
+      // Build fresh context and cache it
+      context = await buildCopilotContext(workspace_id);
+      setCachedContext(workspace_id, context);
+    }
+
+    // Enhance context with conversation history and user preferences
+    const enhancedContext = {
+      ...context,
+      conversation_history: conversation_context?.previous_messages || [],
+      user_preferences: conversation_context?.user_preferences || {},
+      current_context: conversation_context?.current_context || {},
+      query_intent: analyzeQueryIntent(user_query),
+      enhanced_features: enhanced_features || {}
+    };
+
+    // Generate AI response using enhanced Gemini integration
+    const { llm_response, recommendations, tokens_used, insights } = await generateEnhancedGeminiResponse(
+      user_query, 
+      enhancedContext,
+      enhanced_features
+    );
+
+    // Track API usage
+    try {
+      await trackAPIUsage(workspace_id, tokens_used, 'gemini');
+    } catch (error) {
+      console.error('Failed to track API usage:', error);
+      // Continue execution even if tracking fails
+    }
+
+    // Add rate limit and usage headers to response
+    const headers = {
+      'Content-Type': 'application/json',
+      ...getRateLimitHeaders(workspace_id),
+      ...getUsageHeaders(workspace_id, tokens_used)
+    };
 
     return new Response(
-      JSON.stringify({ response: aiResponse }),
-      { status: 200, headers: { 'Content-Type': 'application/json' } }
+      JSON.stringify({ 
+        context: {
+          workspace_id: enhancedContext.workspace_id,
+          timestamp: enhancedContext.timestamp,
+          query_type: enhancedContext.query_intent?.type,
+          // Trim context for response size
+          shopify: {
+            revenue_yesterday: enhancedContext.shopify.revenue_yesterday,
+            revenue_last_7_days: enhancedContext.shopify.revenue_last_7_days,
+            products_count: enhancedContext.shopify.products_count
+          },
+          meta_ads: {
+            spend_yesterday: enhancedContext.meta_ads.spend_yesterday,
+            ad_spend_last_7_days: enhancedContext.meta_ads.ad_spend_last_7_days
+          },
+          alerts_count: enhancedContext.alerts.length,
+          derived: enhancedContext.derived
+        },
+        llm_response,
+        recommendations,
+        insights,
+        tokens_used,
+        query_intent: enhancedContext.query_intent
+      }),
+      { status: 200, headers }
     );
   } catch (error) {
     console.error('Copilot query error:', error);
+    
+    const headers = {
+      'Content-Type': 'application/json'
+    };
+
     return new Response(
       JSON.stringify({ error: 'Failed to process query' }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
+      { status: 500, headers }
     );
   }
 }
 
-async function fetchStoreContext(userId: string) {
+// Enhanced query intent analysis
+function analyzeQueryIntent(query: string) {
+  const lowerQuery = query.toLowerCase();
+  
+  // Define intent patterns
+  const intents = {
+    revenue_analysis: [
+      'revenue', 'sales', 'income', 'earnings', 'profit', 'money made',
+      'how much', 'total sales', 'revenue trend'
+    ],
+    inventory_check: [
+      'stock', 'inventory', 'out of stock', 'low stock', 'running out',
+      'available', 'quantity', 'restock'
+    ],
+    performance_analysis: [
+      'performance', 'best', 'worst', 'top', 'bottom', 'performing',
+      'successful', 'underperforming', 'comparison'
+    ],
+    alerts_review: [
+      'alert', 'warning', 'issue', 'problem', 'notification',
+      'urgent', 'critical', 'attention'
+    ],
+    trend_analysis: [
+      'trend', 'pattern', 'growth', 'decline', 'increase', 'decrease',
+      'over time', 'historical', 'forecast'
+    ],
+    actionable_insights: [
+      'recommend', 'suggest', 'advice', 'should', 'optimize',
+      'improve', 'action', 'next steps'
+    ]
+  };
+  
+  // Calculate intent scores
+  const scores = Object.entries(intents).map(([intent, keywords]) => {
+    const score = keywords.reduce((acc, keyword) => {
+      return acc + (lowerQuery.includes(keyword) ? 1 : 0);
+    }, 0);
+    return { intent, score, confidence: score / keywords.length };
+  });
+  
+  // Find the highest scoring intent
+  const topIntent = scores.reduce((max, current) => 
+    current.score > max.score ? current : max
+  );
+  
+  return {
+    type: topIntent.intent,
+    confidence: topIntent.confidence,
+    keywords_matched: intents[topIntent.intent as keyof typeof intents].filter(keyword => 
+      lowerQuery.includes(keyword)
+    ),
+    complexity: query.length > 100 ? 'high' : query.length > 50 ? 'medium' : 'low'
+  };
+}
+
+// Enhanced Gemini response generation with better context awareness
+async function generateEnhancedGeminiResponse(
+  user_query: string, 
+  context: any,
+  enhanced_features: any = {}
+) {
   try {
-    // Calculate date ranges
-    const last7Days = new Date();
-    last7Days.setDate(last7Days.getDate() - 7);
+    // Build enhanced prompt with conversation context
+    const systemPrompt = buildEnhancedSystemPrompt(context, enhanced_features);
+    const contextualPrompt = buildContextualPrompt(user_query, context);
     
-    const last30Days = new Date();
-    last30Days.setDate(last30Days.getDate() - 30);
+    const requestBody = {
+      contents: [{
+        parts: [{
+          text: `${systemPrompt}\n\n${contextualPrompt}\n\nUser Query: ${user_query}`
+        }]
+      }],
+      generationConfig: {
+        temperature: 0.7,
+        topK: 40,
+        topP: 0.95,
+        maxOutputTokens: enhanced_features.context_aware ? 2048 : 1024,
+      },
+      safetySettings: [
+        {
+          category: "HARM_CATEGORY_HARASSMENT",
+          threshold: "BLOCK_MEDIUM_AND_ABOVE"
+        },
+        {
+          category: "HARM_CATEGORY_HATE_SPEECH",
+          threshold: "BLOCK_MEDIUM_AND_ABOVE"
+        }
+      ]
+    };
 
-    // Fetch recent orders
-    const { data: recentOrders } = await supabase
-      .from('shopify_orders')
-      .select('*')
-      .eq('user_id', userId)
-      .gte('date_created', last7Days.toISOString());
+    const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody)
+    });
 
-    // Fetch all orders for trend analysis
-    const { data: allOrders } = await supabase
-      .from('shopify_orders')
-      .select('revenue, date_created')
-      .eq('user_id', userId)
-      .gte('date_created', last30Days.toISOString());
+    if (!response.ok) {
+      throw new Error(`Gemini API error: ${response.status}`);
+    }
 
-    // Fetch products with stock levels
-    const { data: products } = await supabase
-      .from('shopify_products')
-      .select('*')
-      .eq('user_id', userId);
+    const data = await response.json();
+    
+    if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
+      throw new Error('Invalid response from Gemini API');
+    }
 
-    // Fetch campaign data
-    const { data: campaigns } = await supabase
-      .from('meta_campaigns')
-      .select('*')
-      .eq('user_id', userId)
-      .gte('date', last7Days.toISOString().split('T')[0]);
+    const llm_response = data.candidates[0].content.parts[0].text;
+    const tokens_used = data.usageMetadata?.totalTokenCount || 0;
+    
+    // Generate contextual recommendations
+    const recommendations = generateContextualRecommendations(context, user_query);
+    
+    // Generate insights based on query intent
+    const insights = generateInsights(context, user_query);
 
-    // Calculate metrics
-    const totalRevenue = recentOrders?.reduce((sum, order) => sum + (order.revenue || 0), 0) || 0;
-    const totalOrders = recentOrders?.length || 0;
-    const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
-    const totalAdSpend = campaigns?.reduce((sum, campaign) => sum + (campaign.spend || 0), 0) || 0;
-    const blendedRoas = totalAdSpend > 0 ? totalRevenue / totalAdSpend : 0;
+    return {
+      llm_response,
+      recommendations,
+      insights,
+      tokens_used
+    };
+    
+  } catch (error) {
+    console.error('Enhanced Gemini API error:', error);
+    throw error;
+  }
+}
 
-    // Find low stock items
-    const lowStockItems = products?.filter(p => p.stock_quantity < 10 && p.stock_quantity > 0) || [];
-    const outOfStockItems = products?.filter(p => p.stock_quantity === 0) || [];
+// Build enhanced system prompt with conversation context
+function buildEnhancedSystemPrompt(context: any, enhanced_features: any) {
+  let prompt = `You are an advanced AI business analyst for an e-commerce platform. You have access to comprehensive business data and conversation history.`;
+  
+  if (enhanced_features.context_aware) {
+    prompt += ` You maintain context across conversations and provide personalized insights based on user preferences and previous interactions.`;
+  }
+  
+  if (enhanced_features.include_actions) {
+    prompt += ` You can suggest specific actionable steps and business optimizations.`;
+  }
+  
+  if (enhanced_features.include_suggestions) {
+    prompt += ` You provide proactive suggestions and identify opportunities for improvement.`;
+  }
+  
+  prompt += `\n\nYour responses should be:
+- Data-driven and specific
+- Actionable with clear next steps
+- Contextually relevant to the user's business
+- Professional yet conversational
+- Include relevant metrics and comparisons when available`;
+  
+  return prompt;
+}
 
-    // Calculate campaign performance
+// Build contextual prompt based on query intent and conversation history
+function buildContextualPrompt(user_query: string, context: any) {
+  let prompt = `Current Business Context:\n`;
+  
+  // Add conversation history context
+  if (context.conversation_history && context.conversation_history.length > 0) {
+    prompt += `\nRecent Conversation Context:\n`;
+    context.conversation_history.slice(-3).forEach((msg: any, index: number) => {
+      prompt += `${msg.type === 'user' ? 'User' : 'Assistant'}: ${msg.content.substring(0, 200)}...\n`;
+    });
+  }
+  
+  // Add query intent context
+  if (context.query_intent) {
+    prompt += `\nQuery Intent: ${context.query_intent.type} (confidence: ${(context.query_intent.confidence * 100).toFixed(0)}%)\n`;
+    if (context.query_intent.keywords_matched.length > 0) {
+      prompt += `Key topics: ${context.query_intent.keywords_matched.join(', ')}\n`;
+    }
+  }
+  
+  // Add current business metrics
+  prompt += `\nCurrent Business Metrics:\n`;
+  if (context.shopify) {
+    prompt += `- Revenue (yesterday): $${context.shopify.revenue_yesterday || 0}\n`;
+    prompt += `- Revenue (7 days): $${context.shopify.revenue_last_7_days || 0}\n`;
+    prompt += `- Products: ${context.shopify.products_count || 0}\n`;
+  }
+  
+  if (context.meta_ads) {
+    prompt += `- Ad spend (yesterday): $${context.meta_ads.spend_yesterday || 0}\n`;
+    prompt += `- Ad spend (7 days): $${context.meta_ads.ad_spend_last_7_days || 0}\n`;
+  }
+  
+  if (context.alerts && context.alerts.length > 0) {
+    prompt += `- Active alerts: ${context.alerts.length}\n`;
+    const criticalAlerts = context.alerts.filter((alert: any) => alert.severity === 'critical');
+    if (criticalAlerts.length > 0) {
+      prompt += `- Critical alerts: ${criticalAlerts.length}\n`;
+    }
+  }
+  
+  return prompt;
+}
+
+// Generate contextual recommendations based on business data
+function generateContextualRecommendations(context: any, query: string) {
+  const recommendations = [];
+  
+  // Revenue-based recommendations
+  if (context.shopify?.revenue_yesterday && context.shopify?.revenue_last_7_days) {
+    const dailyAverage = context.shopify.revenue_last_7_days / 7;
+    if (context.shopify.revenue_yesterday < dailyAverage * 0.8) {
+      recommendations.push({
+        type: 'revenue_optimization',
+        priority: 'high',
+        title: 'Revenue Below Average',
+        description: 'Yesterday\'s revenue was significantly below the 7-day average. Consider reviewing marketing campaigns or product promotions.'
+      });
+    }
+  }
+  
+  // Alert-based recommendations
+  if (context.alerts && context.alerts.length > 0) {
+    const criticalAlerts = context.alerts.filter((alert: any) => alert.severity === 'critical');
+    if (criticalAlerts.length > 0) {
+      recommendations.push({
+        type: 'urgent_action',
+        priority: 'critical',
+        title: 'Critical Alerts Require Attention',
+        description: `You have ${criticalAlerts.length} critical alerts that need immediate attention.`
+      });
+    }
+  }
+  
+  // Ad spend efficiency recommendations
+  if (context.meta_ads?.spend_yesterday && context.shopify?.revenue_yesterday) {
+    const roas = context.shopify.revenue_yesterday / context.meta_ads.spend_yesterday;
+    if (roas < 2.0) {
+      recommendations.push({
+        type: 'ad_optimization',
+        priority: 'medium',
+        title: 'Low ROAS Detected',
+        description: `Current ROAS is ${roas.toFixed(2)}. Consider optimizing ad campaigns or adjusting targeting.`
+      });
+    }
+  }
+  
+  return recommendations;
+}
+
+// Generate insights based on query intent and business data
+function generateInsights(context: any, query: string) {
+  const insights = [];
+  
+  // Performance insights
+  if (context.shopify?.revenue_last_7_days && context.meta_ads?.ad_spend_last_7_days) {
+    const weeklyROAS = context.shopify.revenue_last_7_days / context.meta_ads.ad_spend_last_7_days;
+    insights.push(`Your 7-day ROAS is ${weeklyROAS.toFixed(2)}x, ${weeklyROAS > 3 ? 'which is excellent' : weeklyROAS > 2 ? 'which is good' : 'which needs improvement'}.`);
+  }
+  
+  // Growth insights
+  if (context.derived?.growth_rate) {
+    insights.push(`Your business is ${context.derived.growth_rate > 0 ? 'growing' : 'declining'} at ${Math.abs(context.derived.growth_rate * 100).toFixed(1)}% compared to the previous period.`);
+  }
+  
+  // Inventory insights
+  if (context.alerts) {
+    const inventoryAlerts = context.alerts.filter((alert: any) => alert.type?.includes('stock'));
+    if (inventoryAlerts.length > 0) {
+      insights.push(`You have ${inventoryAlerts.length} inventory-related alerts that may impact sales if not addressed.`);
+    }
+  }
+  
+  return insights;
+}
+
+// Legacy function for backward compatibility
+async function generateGeminiResponse(
     const campaignMap = new Map();
     campaigns?.forEach(campaign => {
       if (!campaignMap.has(campaign.campaign_id)) {
@@ -132,6 +485,45 @@ async function fetchStoreContext(userId: string) {
       .sort((a, b) => b.revenue - a.revenue)
       .slice(0, 5);
 
+    // Calculate yesterday's metrics
+    const yesterdayRevenue = yesterdayOrders?.reduce((sum, order) => sum + (order.revenue || 0), 0) || 0;
+    const yesterdayAdSpend = yesterdayCampaigns?.reduce((sum, campaign) => sum + (campaign.spend || 0), 0) || 0;
+
+    // Format structured JSON context
+    const structuredContext = {
+      shopify: {
+        revenue_yesterday: yesterdayRevenue,
+        orders: yesterdayOrders?.map(order => ({
+          id: order.order_id || order.id,
+          sku: order.sku,
+          quantity: order.quantity || 1,
+          total: order.revenue || 0
+        })) || [],
+        products: products?.map(product => ({
+          sku: product.sku,
+          title: product.name || product.title,
+          inventory_quantity: product.stock_quantity || 0,
+          cogs: product.cogs || 0,
+          price: product.price || 0
+        })) || []
+      },
+      meta_ads: {
+        spend_yesterday: yesterdayAdSpend,
+        campaigns: topCampaigns.map(campaign => ({
+          id: campaign.id,
+          name: campaign.name,
+          spend: campaign.spend,
+          roas: campaign.roas
+        }))
+      },
+      alerts: alerts?.map(alert => ({
+        type: alert.type,
+        sku: alert.sku,
+        message: alert.message,
+        severity: alert.severity
+      })) || []
+    };
+
     return {
       totalRevenue,
       totalAdSpend,
@@ -145,6 +537,7 @@ async function fetchStoreContext(userId: string) {
       lowStockItems: lowStockItems.slice(0, 5),
       outOfStockItems: outOfStockItems.slice(0, 5),
       totalProducts: products?.length || 0,
+      structuredContext
     };
   } catch (error) {
     console.error('Error fetching store context:', error);
@@ -161,91 +554,149 @@ async function fetchStoreContext(userId: string) {
       lowStockItems: [],
       outOfStockItems: [],
       totalProducts: 0,
+      structuredContext: {
+        shopify: {
+          revenue_yesterday: 0,
+          orders: [],
+          products: []
+        },
+        meta_ads: {
+          spend_yesterday: 0,
+          campaigns: []
+        },
+        alerts: []
+      }
     };
   }
 }
 
-async function generateAIResponse(query: string, storeData: any): Promise<string> {
-  // If OpenAI API key is not available, use rule-based responses
-  if (!OPENAI_API_KEY) {
-    return generateRuleBasedResponse(query, storeData);
+async function generateGeminiResponse(
+  user_query: string, 
+  context: CopilotContext
+): Promise<{
+  llm_response: string;
+  recommendations: any[];
+  tokens_used: number;
+}> {
+  // If Gemini API key is not available, use rule-based responses
+  if (!GEMINI_API_KEY) {
+    return {
+      llm_response: generateRuleBasedResponse(user_query, context),
+      recommendations: [],
+      tokens_used: 0
+    };
   }
 
   try {
-    const systemPrompt = `You are an expert E-commerce Analytics AI assistant. You analyze store performance data and provide actionable insights to business owners.
+    const systemPrompt = `You are **E-commerce Copilot OS**, an AI assistant built for ecommerce founders.
+You always use the structured data provided in the JSON context below to give factual, helpful answers.
 
-Current Store Data:
-- Total Revenue (Last 7 days): $${storeData.totalRevenue.toFixed(2)}
-- Total Ad Spend (Last 7 days): $${storeData.totalAdSpend.toFixed(2)}
-- Blended ROAS: ${storeData.blendedRoas.toFixed(2)}x
-- Total Orders: ${storeData.totalOrders}
-- Average Order Value: $${storeData.avgOrderValue.toFixed(2)}
-- Total Products: ${storeData.totalProducts}
+---
 
-Top Performing SKUs:
-${storeData.topSkus.map(sku => `- ${sku.name} (${sku.sku}): $${sku.revenue.toFixed(2)} revenue, ${sku.quantity} units sold, ${sku.stockLevel} in stock`).join('\n')}
+## Rules
+1. Always rely on the JSON context for numbers, products, campaigns, and alerts.
+2. Never invent data. If information is missing, say:
+   > "I don't have that data yet. Please connect the integration."
+3. Keep answers clear and actionable. Use tables or bullet points if needed.
+4. Prioritize insights that help the founder **increase profit, prevent stockouts, or optimize ads**.
+5. Be concise, avoid jargon, and give next steps if possible.
 
-Top Campaigns:
-${storeData.topCampaigns.map(campaign => `- ${campaign.name}: $${campaign.spend.toFixed(2)} spend, $${campaign.revenue.toFixed(2)} revenue, ${campaign.roas.toFixed(2)}x ROAS, $${campaign.profit.toFixed(2)} profit`).join('\n')}
+---
 
-${storeData.underperformingCampaigns.length > 0 ? `Underperforming Campaigns:
-${storeData.underperformingCampaigns.map(campaign => `- ${campaign.name}: ${campaign.roas.toFixed(2)}x ROAS (below 2.0x), losing $${Math.abs(campaign.profit).toFixed(2)}`).join('\n')}` : ''}
+## JSON Context
+${JSON.stringify(context, null, 2)}
 
-Low Stock Items:
-${storeData.lowStockItems.map(item => `- ${item.name} (${item.sku}): ${item.stock_quantity} units left`).join('\n')}
-
-Out of Stock Items:
-${storeData.outOfStockItems.map(item => `- ${item.name} (${item.sku}): 0 units`).join('\n')}
+---
 
 Guidelines:
-- Explain insights in simple, business-friendly language
-- Provide specific, actionable recommendations
-- Include relevant numbers and percentages in your responses
-- Suggest concrete actions (restock items, adjust pricing, focus marketing)
-- For campaign questions, analyze ROAS, profit, and suggest optimizations
-- Recommend pausing campaigns with ROAS < 1.5x
-- Never execute actions - only recommend them
-- Ask clarifying questions when needed`;
+- Calculate profit as: Revenue - (Ad Spend + COGS)
+- Identify underperforming campaigns with ROAS < 1.0
+- Highlight inventory risks from alerts
+- Provide actionable business insights
+- Stay strictly within the JSON data
+- Be a profit-first advisor, not just a chatbot
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+User Query: ${user_query}`;
+
+    const requestBody = {
+      contents: [{
+        parts: [{
+          text: systemPrompt
+        }]
+      }],
+      generationConfig: {
+        temperature: 0.7,
+        maxOutputTokens: 1000,
+        topP: 0.8,
+        topK: 10
+      }
+    };
+
+    const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        model: 'gpt-4',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: query }
-        ],
-        max_tokens: 500,
-        temperature: 0.7,
-      }),
+      body: JSON.stringify(requestBody)
     });
 
     if (!response.ok) {
-      throw new Error(`OpenAI API error: ${response.status}`);
+      const errorText = await response.text();
+      console.error('Gemini API error:', response.status, errorText);
+      throw new Error(`Gemini API error: ${response.status}`);
     }
 
     const data = await response.json();
-    return data.choices[0]?.message?.content || 'I apologize, but I couldn\'t generate a response at this time.';
+    
+    if (!data.candidates || data.candidates.length === 0) {
+      throw new Error('No response from Gemini API');
+    }
+
+    const candidate = data.candidates[0];
+    let llm_response = '';
+    let recommendations: any[] = [];
+    let tokens_used = 0;
+
+    // Extract text response
+    if (candidate.content && candidate.content.parts) {
+      for (const part of candidate.content.parts) {
+        if (part.text) {
+          llm_response += part.text;
+        }
+      }
+    }
+
+    // Estimate tokens used (rough approximation)
+    tokens_used = Math.ceil((systemPrompt.length + llm_response.length) / 4);
+
+    return {
+      llm_response: llm_response || 'I apologize, but I couldn\'t generate a response at this time.',
+      recommendations,
+      tokens_used
+    };
   } catch (error) {
-    console.error('OpenAI API error:', error);
-    return generateRuleBasedResponse(query, storeData);
+    console.error('Gemini API error:', error);
+    return {
+      llm_response: generateRuleBasedResponse(user_query, context),
+      recommendations: [],
+      tokens_used: 0
+    };
   }
 }
 
-function generateRuleBasedResponse(query: string, storeData: any): string {
+function generateRuleBasedResponse(query: string, context: CopilotContext): string {
   const lowerQuery = query.toLowerCase();
 
   if (lowerQuery.includes('campaign') || lowerQuery.includes('ads') || lowerQuery.includes('roas')) {
-    if (storeData.underperformingCampaigns.length > 0) {
-      const worst = storeData.underperformingCampaigns[0];
-      return `⚠️ Your "${worst.name}" campaign is underperforming with ${worst.roas.toFixed(2)}x ROAS (spent $${worst.spend.toFixed(2)}, made $${worst.revenue.toFixed(2)}). This is losing you $${Math.abs(worst.profit).toFixed(2)}. I recommend pausing this campaign or reducing budget by 50% and testing new creatives. Your blended ROAS is ${storeData.blendedRoas.toFixed(2)}x across all campaigns.`;
-    } else if (storeData.topCampaigns.length > 0) {
-      const best = storeData.topCampaigns[0];
-      return `🎯 Your best campaign "${best.name}" has ${best.roas.toFixed(2)}x ROAS with $${best.profit.toFixed(2)} profit. Overall blended ROAS is ${storeData.blendedRoas.toFixed(2)}x. ${storeData.blendedRoas > 3 ? 'Excellent performance! Consider scaling winning campaigns.' : storeData.blendedRoas > 2 ? 'Good performance, room for optimization.' : 'Below target - review underperforming campaigns.'}`;
+    const underperformingCampaigns = context.meta_ads.top_campaigns.filter(c => c.roas < 1.0);
+    if (underperformingCampaigns.length > 0) {
+      const worst = underperformingCampaigns[0];
+      const profit = worst.revenue - worst.spend;
+      return `⚠️ Your "${worst.name}" campaign is underperforming with ${worst.roas.toFixed(2)}x ROAS (spent $${worst.spend.toFixed(2)}, made $${worst.revenue.toFixed(2)}). This is losing you $${Math.abs(profit).toFixed(2)}. I recommend pausing this campaign or reducing budget by 50% and testing new creatives. Your blended ROAS is ${context.derived.blended_roas.toFixed(2)}x across all campaigns.`;
+    } else if (context.meta_ads.top_campaigns.length > 0) {
+      const best = context.meta_ads.top_campaigns[0];
+      const profit = best.revenue - best.spend;
+      return `🎯 Your best campaign "${best.name}" has ${best.roas.toFixed(2)}x ROAS with $${profit.toFixed(2)} profit. Overall blended ROAS is ${context.derived.blended_roas.toFixed(2)}x. ${context.derived.blended_roas > 3 ? 'Excellent performance! Consider scaling winning campaigns.' : context.derived.blended_roas > 2 ? 'Good performance, room for optimization.' : 'Below target - review underperforming campaigns.'}`;
     } else {
       return `I don't see any campaign data yet. Make sure your Meta Ads integration is connected in Settings to analyze campaign performance and ROAS.`;
     }
@@ -259,33 +710,37 @@ function generateRuleBasedResponse(query: string, storeData: any): string {
     }
   }
   if (lowerQuery.includes('profit') || lowerQuery.includes('revenue')) {
-    const grossProfit = storeData.totalRevenue - storeData.totalAdSpend;
-    const margin = storeData.totalRevenue > 0 ? (grossProfit / storeData.totalRevenue) * 100 : 0;
-    return `📊 Last 7 days: $${storeData.totalRevenue.toFixed(2)} revenue, $${storeData.totalAdSpend.toFixed(2)} ad spend, $${grossProfit.toFixed(2)} gross profit (${margin.toFixed(1)}% margin). Blended ROAS: ${storeData.blendedRoas.toFixed(2)}x. ${storeData.topSkus.length > 0 ? `Top product: ${storeData.topSkus[0].name} ($${storeData.topSkus[0].revenue.toFixed(2)} revenue).` : ''}`;
+    const grossProfit = context.shopify.revenue_last_7_days - context.meta_ads.ad_spend_last_7_days;
+    const margin = context.shopify.revenue_last_7_days > 0 ? (grossProfit / context.shopify.revenue_last_7_days) * 100 : 0;
+    return `📊 Last 7 days: $${context.shopify.revenue_last_7_days.toFixed(2)} revenue, $${context.meta_ads.ad_spend_last_7_days.toFixed(2)} ad spend, $${grossProfit.toFixed(2)} gross profit (${margin.toFixed(1)}% margin). Blended ROAS: ${context.derived.blended_roas.toFixed(2)}x. Yesterday's profit: $${context.derived.gross_profit_yesterday.toFixed(2)}. ${context.shopify.top_skus.length > 0 ? `Top product: ${context.shopify.top_skus[0].sku} ($${context.shopify.top_skus[0].revenue.toFixed(2)} revenue).` : ''}`;
   }
 
   if (lowerQuery.includes('stock') || lowerQuery.includes('inventory')) {
-    if (storeData.outOfStockItems.length > 0) {
-      return `⚠️ You have ${storeData.outOfStockItems.length} products completely out of stock: ${storeData.outOfStockItems.map(item => item.name).join(', ')}. ${storeData.lowStockItems.length > 0 ? `Additionally, ${storeData.lowStockItems.length} products are running low: ${storeData.lowStockItems.map(item => `${item.name} (${item.stock_quantity} left)`).join(', ')}.` : ''} I recommend restocking these items immediately to avoid lost sales.`;
-    } else if (storeData.lowStockItems.length > 0) {
-      return `You have ${storeData.lowStockItems.length} products running low on stock: ${storeData.lowStockItems.map(item => `${item.name} (${item.stock_quantity} units left)`).join(', ')}. Consider restocking these items soon to maintain sales momentum.`;
+    const outOfStockAlerts = context.alerts.filter(alert => alert.type === 'Out of Stock');
+    const lowStockAlerts = context.alerts.filter(alert => alert.type === 'Low Stock');
+    
+    if (outOfStockAlerts.length > 0) {
+      return `⚠️ You have ${outOfStockAlerts.length} products completely out of stock: ${outOfStockAlerts.map(alert => alert.sku).join(', ')}. ${lowStockAlerts.length > 0 ? `Additionally, ${lowStockAlerts.length} products are running low: ${lowStockAlerts.map(alert => alert.sku).join(', ')}.` : ''} I recommend restocking these items immediately to avoid lost sales.`;
+    } else if (lowStockAlerts.length > 0) {
+      return `You have ${lowStockAlerts.length} products running low on stock: ${lowStockAlerts.map(alert => `${alert.sku} (${alert.message})`).join(', ')}. Consider restocking these items soon to maintain sales momentum.`;
     } else {
       return `Your inventory levels look healthy! All products appear to be well-stocked. Keep monitoring your top sellers to ensure you don't run out of popular items.`;
     }
   }
 
   if (lowerQuery.includes('best') || lowerQuery.includes('top') || lowerQuery.includes('performing')) {
-    if (storeData.topSkus.length > 0) {
-      return `Your best performing products in the last 7 days are:\n\n${storeData.topSkus.map((sku, index) => `${index + 1}. **${sku.name}** - $${sku.revenue.toFixed(2)} revenue (${sku.quantity} units sold, ${sku.stockLevel} in stock)`).join('\n')}\n\nThese products are driving your sales. Consider increasing marketing spend on these winners and ensuring adequate inventory levels.`;
+    if (context.shopify.top_skus.length > 0) {
+      return `Your best performing products in the last 7 days are:\n\n${context.shopify.top_skus.map((sku, index) => `${index + 1}. **${sku.sku}** - $${sku.revenue.toFixed(2)} revenue (${sku.qty} units sold, ${sku.inventory_qty} in stock)`).join('\n')}\n\nThese products are driving your sales. Consider increasing marketing spend on these winners and ensuring adequate inventory levels.`;
     } else {
       return `I don't have enough recent sales data to identify your top performing products. Make sure your Shopify integration is working and you have recent orders to analyze.`;
     }
   }
 
   if (lowerQuery.includes('orders') || lowerQuery.includes('sales')) {
-    return `You've processed ${storeData.totalOrders} orders in the last 7 days, generating $${storeData.totalRevenue.toFixed(2)} in total revenue. Your average order value is $${storeData.avgOrderValue.toFixed(2)}. ${storeData.totalOrders > 0 ? 'Your store is actively generating sales!' : 'Consider reviewing your marketing strategy to drive more orders.'}`;
+    const avgOrderValue = context.shopify.orders_last_7_days > 0 ? context.shopify.revenue_last_7_days / context.shopify.orders_last_7_days : 0;
+    return `You've processed ${context.shopify.orders_last_7_days} orders in the last 7 days, generating $${context.shopify.revenue_last_7_days.toFixed(2)} in total revenue. Your average order value is $${avgOrderValue.toFixed(2)}. ${context.shopify.orders_last_7_days > 0 ? 'Your store is actively generating sales!' : 'Consider reviewing your marketing strategy to drive more orders.'}`;
   }
 
   // Default response
-  return `I'm here to help you analyze your store performance! I can provide insights on your revenue, campaigns, ROAS, top products, inventory levels, and sales trends. Based on your current data: $${storeData.totalRevenue.toFixed(2)} revenue, $${storeData.totalAdSpend.toFixed(2)} ad spend, ${storeData.blendedRoas.toFixed(2)}x ROAS over the last 7 days. What specific aspect would you like me to analyze?`;
+  return `I'm here to help you analyze your store performance! I can provide insights on your revenue, campaigns, ROAS, top products, inventory levels, and sales trends. Based on your current data: $${context.shopify.revenue_last_7_days.toFixed(2)} revenue, $${context.meta_ads.ad_spend_last_7_days.toFixed(2)} ad spend, ${context.derived.blended_roas.toFixed(2)}x ROAS over the last 7 days. What specific aspect would you like me to analyze?`;
 }

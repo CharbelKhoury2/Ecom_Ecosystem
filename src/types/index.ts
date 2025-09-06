@@ -26,13 +26,15 @@ export interface CampaignData {
 
 export interface Alert {
   id: string;
-  type: 'roas-drop' | 'low-stock' | 'refund-spike' | 'campaign-performance';
-  title: string;
+  type: 'Low Stock' | 'Out of Stock' | 'roas-drop' | 'refund-spike' | 'campaign-performance';
+  sku?: string;
   message: string;
-  severity: 'high' | 'medium' | 'low';
-  status: 'active' | 'dismissed' | 'resolved';
-  createdAt: Date;
-  actionable: boolean;
+  severity: 'warning' | 'critical' | 'high' | 'medium' | 'low';
+  status: 'open' | 'closed' | 'active' | 'dismissed' | 'resolved';
+  created_at: string;
+  updated_at?: string;
+  user_id?: string;
+  actionable?: boolean;
 }
 
 export interface ChatMessage {

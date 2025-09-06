@@ -5,22 +5,32 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:api": "node server.js",
+    "dev:full": "concurrently \"npm run dev\" \"npm run dev:api\"",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "check": "tsc --noEmit && npm run lint",
+    "type-check": "tsc --noEmit",
+    "preview": "vite preview",
+    "seed": "node scripts/seed-database.js"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@supabase/supabase-js": "^2.57.2",
     "@types/react-router-dom": "^5.3.3",
     "clsx": "^2.1.1",
+    "concurrently": "^8.2.2",
+    "cors": "^2.8.5",
     "crypto": "^1.0.1",
     "date-fns": "^4.1.0",
     "dotenv": "^17.2.2",
+    "express": "^4.18.2",
     "lucide-react": "^0.344.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^7.8.2",
-    "recharts": "^3.1.2"
+    "recharts": "^3.1.2",
+    "uuid": "^12.0.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.9.1",
