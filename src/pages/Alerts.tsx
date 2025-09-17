@@ -37,7 +37,7 @@ const Alerts: React.FC = () => {
         severity: severityFilter !== 'all' ? severityFilter : ''
       });
       
-      const response = await fetch(`/src/api/alerts/inventory?${params}`);
+      const response = await fetch(`/api/alerts/inventory?${params}`);
       
       if (response.ok) {
         const data = await response.json();
@@ -58,7 +58,7 @@ const Alerts: React.FC = () => {
   const runInventoryCheck = async () => {
     setRefreshing(true);
     try {
-      const response = await fetch('/src/api/alerts/inventory', {
+      const response = await fetch('/api/alerts/inventory', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -88,7 +88,7 @@ const Alerts: React.FC = () => {
   const runScheduler = async () => {
     setSchedulerRunning(true);
     try {
-      const response = await fetch('/src/api/alerts/scheduler', {
+      const response = await fetch('/api/alerts/scheduler', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -119,7 +119,7 @@ const Alerts: React.FC = () => {
 
   const handleAcknowledge = async (alertId: string) => {
     try {
-      const response = await fetch(`/src/api/alerts/${alertId}/acknowledge`, {
+      const response = await fetch(`/api/alerts/${alertId}/acknowledge`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -163,7 +163,7 @@ const Alerts: React.FC = () => {
     }
     
     try {
-      const response = await fetch(`/src/api/alerts/${alertId}/mock_restock`, {
+      const response = await fetch(`/api/alerts/${alertId}/mock_restock`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -490,7 +490,7 @@ const Alerts: React.FC = () => {
                         Acknowledge
                       </button>
                     )}
-                    {process.env.NODE_ENV !== 'production' && (
+                    {import.meta.env.DEV && (
                       <button
                         onClick={() => handleMockRestock(alert.id)}
                         className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"

@@ -1,261 +1,130 @@
-import express from 'express';
+// Real-time Data API Endpoint
 import realTimeDataService from '../services/realTimeDataService.js';
 
-const router = express.Router();
-
-// Get comprehensive dashboard data
-router.get('/dashboard', async (req, res) => {
+export async function GET(request) {
   try {
-    const dashboardData = await realTimeDataService.getDashboardData();
-    
-    res.json({
-      data: dashboardData,
-      timestamp: new Date().toISOString(),
-      success: true
-    });
-  } catch (error) {
-    console.error('Error fetching dashboard data:', error);
-    res.status(500).json({
-      error: 'Failed to fetch dashboard data',
-      message: error.message,
-      timestamp: new Date().toISOString(),
-      success: false
-    });
-  }
-});
+    const url = new URL(request.url);
+    const dataType = url.searchParams.get('type') || 'dashboard';
+    const days = parseInt(url.searchParams.get('days') || '30');
+    const metricType = url.searchParams.get('metric');
 
-// Get real-time sales data
-router.get('/sales', async (req, res) => {
-  try {
-    const salesData = await realTimeDataService.getSalesData();
-    
-    res.json({
-      data: salesData,
-      timestamp: new Date().toISOString(),
-      success: true
-    });
-  } catch (error) {
-    console.error('Error fetching sales data:', error);
-    res.status(500).json({
-      error: 'Failed to fetch sales data',
-      message: error.message,
-      timestamp: new Date().toISOString(),
-      success: false
-    });
-  }
-});
+    let data;
 
-// Get real-time inventory data
-router.get('/inventory', async (req, res) => {
-  try {
-    const inventoryData = await realTimeDataService.getInventoryData();
-    
-    res.json({
-      data: inventoryData,
-      timestamp: new Date().toISOString(),
-      success: true
-    });
-  } catch (error) {
-    console.error('Error fetching inventory data:', error);
-    res.status(500).json({
-      error: 'Failed to fetch inventory data',
-      message: error.message,
-      timestamp: new Date().toISOString(),
-      success: false
-    });
-  }
-});
-
-// Get real-time marketing data
-router.get('/marketing', async (req, res) => {
-  try {
-    const marketingData = await realTimeDataService.getMarketingData();
-    
-    res.json({
-      data: marketingData,
-      timestamp: new Date().toISOString(),
-      success: true
-    });
-  } catch (error) {
-    console.error('Error fetching marketing data:', error);
-    res.status(500).json({
-      error: 'Failed to fetch marketing data',
-      message: error.message,
-      timestamp: new Date().toISOString(),
-      success: false
-    });
-  }
-});
-
-// Get Shopify data
-router.get('/shopify', async (req, res) => {
-  try {
-    const shopifyData = await realTimeDataService.getShopifyData();
-    
-    res.json({
-      data: shopifyData,
-      timestamp: new Date().toISOString(),
-      success: true
-    });
-  } catch (error) {
-    console.error('Error fetching Shopify data:', error);
-    res.status(500).json({
-      error: 'Failed to fetch Shopify data',
-      message: error.message,
-      timestamp: new Date().toISOString(),
-      success: false
-    });
-  }
-});
-
-// Get Meta Ads data
-router.get('/meta-ads', async (req, res) => {
-  try {
-    const metaAdsData = await realTimeDataService.getMetaAdsData();
-    
-    res.json({
-      data: metaAdsData,
-      timestamp: new Date().toISOString(),
-      success: true
-    });
-  } catch (error) {
-    console.error('Error fetching Meta Ads data:', error);
-    res.status(500).json({
-      error: 'Failed to fetch Meta Ads data',
-      message: error.message,
-      timestamp: new Date().toISOString(),
-      success: false
-    });
-  }
-});
-
-// Get Supabase analytics
-router.get('/analytics', async (req, res) => {
-  try {
-    const analyticsData = await realTimeDataService.getSupabaseAnalytics();
-    
-    res.json({
-      data: analyticsData,
-      timestamp: new Date().toISOString(),
-      success: true
-    });
-  } catch (error) {
-    console.error('Error fetching analytics data:', error);
-    res.status(500).json({
-      error: 'Failed to fetch analytics data',
-      message: error.message,
-      timestamp: new Date().toISOString(),
-      success: false
-    });
-  }
-});
-
-// Health check for all services
-router.get('/health', async (req, res) => {
-  try {
-    const healthStatus = await realTimeDataService.healthCheck();
-    
-    res.json({
-      health: healthStatus,
-      timestamp: new Date().toISOString(),
-      success: true
-    });
-  } catch (error) {
-    console.error('Error checking service health:', error);
-    res.status(500).json({
-      error: 'Failed to check service health',
-      message: error.message,
-      timestamp: new Date().toISOString(),
-      success: false
-    });
-  }
-});
-
-// Clear cache endpoint
-router.post('/cache/clear', (req, res) => {
-  try {
-    realTimeDataService.clearCache();
-    
-    res.json({
-      message: 'Cache cleared successfully',
-      timestamp: new Date().toISOString(),
-      success: true
-    });
-  } catch (error) {
-    console.error('Error clearing cache:', error);
-    res.status(500).json({
-      error: 'Failed to clear cache',
-      message: error.message,
-      timestamp: new Date().toISOString(),
-      success: false
-    });
-  }
-});
-
-// Webhook endpoint for real-time updates (placeholder)
-router.post('/webhook/:service', (req, res) => {
-  try {
-    const { service } = req.params;
-    const payload = req.body;
-    
-    console.log(`Received webhook from ${service}:`, payload);
-    
-    // Clear relevant cache when data updates
-    realTimeDataService.clearCache();
-    
-    res.json({
-      message: `Webhook received from ${service}`,
-      timestamp: new Date().toISOString(),
-      success: true
-    });
-  } catch (error) {
-    console.error('Error processing webhook:', error);
-    res.status(500).json({
-      error: 'Failed to process webhook',
-      message: error.message,
-      timestamp: new Date().toISOString(),
-      success: false
-    });
-  }
-});
-
-// Test endpoint for AI Copilot with real-time data
-router.post('/test/ai-query', async (req, res) => {
-  try {
-    const { query, userId = 'test_user' } = req.body;
-    
-    if (!query) {
-      return res.status(400).json({
-        error: 'Query is required',
-        timestamp: new Date().toISOString(),
-        success: false
-      });
+    switch (dataType) {
+      case 'sales':
+        data = await realTimeDataService.getSalesData();
+        break;
+      case 'inventory':
+        data = await realTimeDataService.getInventoryData();
+        break;
+      case 'marketing':
+        data = await realTimeDataService.getMarketingData();
+        break;
+      case 'analytics':
+        data = await realTimeDataService.getShopifyAnalytics(days);
+        break;
+      case 'alerts':
+        data = await realTimeDataService.getRealTimeAlerts();
+        break;
+      case 'freshness':
+        data = realTimeDataService.getDataFreshness();
+        break;
+      case 'connection':
+        data = await realTimeDataService.testShopifyConnection();
+        break;
+      case 'metric':
+        if (metricType) {
+          data = await realTimeDataService.getMetricData(metricType);
+        } else {
+          data = { error: 'Metric type required when using metric data type' };
+        }
+        break;
+      case 'dashboard':
+      default:
+        data = await realTimeDataService.getDashboardData();
+        break;
     }
-    
-    // Import AI service dynamically to avoid circular dependencies
-    const { default: aiService } = await import('../services/aiService.js');
-    
-    // Generate AI response with real-time data
-    const response = await aiService.generateEnhancedResponse(query, userId, {
-      testMode: true,
-      realTimeDataEnabled: true
-    });
-    
-    res.json({
-      query,
-      response,
-      timestamp: new Date().toISOString(),
-      success: true
-    });
-  } catch (error) {
-    console.error('Error testing AI query:', error);
-    res.status(500).json({
-      error: 'Failed to process AI query',
-      message: error.message,
-      timestamp: new Date().toISOString(),
-      success: false
-    });
-  }
-});
 
-export default router;
+    return new Response(
+      JSON.stringify({
+        success: true,
+        dataType,
+        data,
+        timestamp: new Date().toISOString()
+      }),
+      { 
+        status: 200, 
+        headers: { 
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate'
+        } 
+      }
+    );
+  } catch (error) {
+    console.error('Real-time data API error:', error);
+    return new Response(
+      JSON.stringify({ 
+        success: false,
+        error: 'Failed to fetch real-time data',
+        details: error.message 
+      }),
+      { 
+        status: 500, 
+        headers: { 'Content-Type': 'application/json' } 
+      }
+    );
+  }
+}
+
+export async function POST(request) {
+  try {
+    const { action, key } = await request.json();
+
+    let result;
+
+    switch (action) {
+      case 'clearCache':
+        realTimeDataService.clearCache(key);
+        result = { message: key ? `Cache cleared for ${key}` : 'All cache cleared' };
+        break;
+      case 'refreshData':
+        realTimeDataService.simulateRealTimeUpdate();
+        result = { message: 'Data refresh triggered' };
+        break;
+      case 'testConnection':
+        result = await realTimeDataService.testShopifyConnection();
+        break;
+      default:
+        return new Response(
+          JSON.stringify({ error: 'Invalid action' }),
+          { status: 400, headers: { 'Content-Type': 'application/json' } }
+        );
+    }
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        action,
+        result,
+        timestamp: new Date().toISOString()
+      }),
+      { 
+        status: 200, 
+        headers: { 'Content-Type': 'application/json' } 
+      }
+    );
+  } catch (error) {
+    console.error('Real-time data action error:', error);
+    return new Response(
+      JSON.stringify({ 
+        success: false,
+        error: 'Failed to execute action',
+        details: error.message 
+      }),
+      { 
+        status: 500, 
+        headers: { 'Content-Type': 'application/json' } 
+      }
+    );
+  }
+}

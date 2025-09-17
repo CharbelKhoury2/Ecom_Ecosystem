@@ -1,4 +1,4 @@
-import { supabase } from '../../lib/supabase';
+import { supabase } from '../../lib/supabase-server';
 import { subDays, format } from 'date-fns';
 
 export async function GET(request: Request) {

@@ -1,4 +1,4 @@
-import { supabase } from '../../lib/supabase';
+import { supabase } from '../../lib/supabase-server';
 import { encrypt } from '../../lib/encryption';
 import { MetaAdsAPI } from '../../lib/meta';
 

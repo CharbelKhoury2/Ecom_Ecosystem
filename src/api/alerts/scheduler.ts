@@ -1,4 +1,4 @@
-import { supabase } from '../../lib/supabase';
+import { supabase } from '../../lib/supabase-server';
 
 // Exponential backoff utility
 function delay(ms: number) {
@@ -52,7 +52,7 @@ async function logAuditEvent(actor: string, action: string, targetType: string, 
 async function runInventoryCheckForWorkspace(workspace_id: string) {
   try {
     const response = await retryWithBackoff(async () => {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/alerts/inventory`, {
+      const res = await fetch(`${process.env.VITE_APP_URL || 'http://localhost:3001'}/api/alerts/inventory`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

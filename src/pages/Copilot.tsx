@@ -3,6 +3,7 @@ import { Send, Bot, User, Copy, Trash2, Clock } from 'lucide-react';
 import { ChatMessage } from '../types';
 import { format } from 'date-fns';
 import { supabase } from '../lib/supabase';
+import MarkdownRenderer from '../components/MarkdownRenderer';
 
 const Copilot: React.FC = () => {
   const [user, setUser] = useState<any>(null);
@@ -94,7 +95,7 @@ const Copilot: React.FC = () => {
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <Bot className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-            <h1 className="text-xl font-semibold text-gray-900 dark:text-white">AI Copilot</h1>
+            <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Neo AI Assistant</h1>
           </div>
           
           {messages.length > 0 && (
@@ -115,10 +116,10 @@ const Copilot: React.FC = () => {
           <div className="text-center py-12">
             <Bot className="h-12 w-12 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
             <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-              Ask me anything about your store performance
+              Hi! I'm Neo, your AI business assistant
             </h2>
             <p className="text-gray-600 dark:text-gray-400 mb-6">
-              I can analyze your revenue, inventory, sales trends, and provide actionable insights based on your Shopify data
+              I can analyze your business data, create visualizations, and provide insights with rich formatting and interactive charts
             </p>
             
             {/* Quick Actions */}
@@ -157,9 +158,16 @@ const Copilot: React.FC = () => {
                         : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white'
                     }`}
                   >
-                    <div className="whitespace-pre-wrap text-sm leading-relaxed">
-                      {message.content}
-                    </div>
+                    {message.type === 'user' ? (
+                      <div className="whitespace-pre-wrap text-sm leading-relaxed">
+                        {message.content}
+                      </div>
+                    ) : (
+                      <MarkdownRenderer 
+                        content={message.content}
+                        className="text-sm leading-relaxed"
+                      />
+                    )}
                   </div>
                   
                   <div className="flex items-center justify-between mt-2">
@@ -214,7 +222,7 @@ const Copilot: React.FC = () => {
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && handleSendMessage(inputValue)}
-            placeholder="Ask me about your store performance..."
+            placeholder="Ask Neo about your business data, request charts and analysis..."
             className="flex-1 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             disabled={isLoading}
           />

@@ -1,4 +1,4 @@
-import { supabase } from '../../lib/supabase';
+import { supabase } from '../../lib/supabase-server';
 
 // Mock shipping providers data
 const MOCK_PROVIDERS = {
@@ -224,3 +224,4 @@ export async function POST(request: Request) {
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
   }
+}

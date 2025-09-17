@@ -1,5 +1,14 @@
-import { supabase } from './supabase';
+import { supabase } from './supabase-server';
 import { decrypt } from './encryption';
+
+// Environment variables for Shopify configuration
+const SHOPIFY_CONFIG = {
+  shopDomain: process.env.SHOPIFY_SHOP_DOMAIN || '',
+  accessToken: process.env.SHOPIFY_ACCESS_TOKEN || '',
+  clientId: process.env.SHOPIFY_CLIENT_ID || '',
+  clientSecret: process.env.SHOPIFY_CLIENT_SECRET || '',
+  apiVersion: process.env.SHOPIFY_API_VERSION || '2024-01'
+};
 
 export interface ShopifyOrder {
   id: number;
@@ -53,7 +62,7 @@ export class ShopifyAPI {
   }
 
   private async makeRequest(endpoint: string, params: Record<string, any> = {}) {
-    const url = new URL(`https://${this.storeUrl}/admin/api/2024-04/${endpoint}`);
+    const url = new URL(`https://${this.storeUrl}/admin/api/${SHOPIFY_CONFIG.apiVersion}/${endpoint}`);
     
     // Add query parameters
     Object.keys(params).forEach(key => {
@@ -124,6 +133,22 @@ export class ShopifyAPI {
   }
 }
 
+// Create Shopify API instance using environment variables (Admin API)
+export function getShopifyAPIFromEnv(): ShopifyAPI | null {
+  try {
+    if (!SHOPIFY_CONFIG.shopDomain || !SHOPIFY_CONFIG.accessToken) {
+      console.warn('Shopify environment variables not configured');
+      return null;
+    }
+
+    return new ShopifyAPI(SHOPIFY_CONFIG.shopDomain, SHOPIFY_CONFIG.accessToken);
+  } catch (error) {
+    console.error('Failed to create Shopify API instance from environment:', error);
+    return null;
+  }
+}
+
+// Get Shopify API instance from user credentials (existing functionality)
 export async function getShopifyAPI(userId: string): Promise<ShopifyAPI | null> {
   try {
     const { data: credentials, error } = await supabase
@@ -142,4 +167,13 @@ export async function getShopifyAPI(userId: string): Promise<ShopifyAPI | null> 
     console.error('Failed to get Shopify API instance:', error);
     return null;
   }
+}
+
+// Test Shopify connection using environment variables
+export async function testShopifyConnection(): Promise<boolean> {
+  const api = getShopifyAPIFromEnv();
+  if (!api) {
+    return false;
+  }
+  return await api.testConnection();
 }

@@ -1,4 +1,4 @@
-import { supabase } from '../../lib/supabase';
+import { supabase } from '../../lib/supabase-server';
 
 // Mock Meta Ads API responses
 const MOCK_CAMPAIGN_STATUSES = {

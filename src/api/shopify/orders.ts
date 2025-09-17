@@ -1,23 +1,37 @@
-import { supabase } from '../../lib/supabase';
-import { getShopifyAPI } from '../../lib/shopify';
+import { supabase } from '../../lib/supabase-server';
+import { getShopifyAPI, getShopifyAPIFromEnv } from '../../lib/shopify';
 
 export async function POST(request: Request) {
   try {
-    const { userId, syncDays = 30 } = await request.json();
+    const { userId, syncDays = 30, useEnvCredentials = false } = await request.json();
 
-    if (!userId) {
-      return new Response(
-        JSON.stringify({ error: 'Missing userId' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const shopifyAPI = await getShopifyAPI(userId);
-    if (!shopifyAPI) {
-      return new Response(
-        JSON.stringify({ error: 'Shopify not connected' }),
-        { status: 401, headers: { 'Content-Type': 'application/json' } }
-      );
+    let shopifyAPI;
+    
+    if (useEnvCredentials) {
+      // Use environment variables (admin API)
+      shopifyAPI = getShopifyAPIFromEnv();
+      if (!shopifyAPI) {
+        return new Response(
+          JSON.stringify({ error: 'Shopify environment credentials not configured' }),
+          { status: 401, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+    } else {
+      // Use user-specific credentials
+      if (!userId) {
+        return new Response(
+          JSON.stringify({ error: 'Missing userId' }),
+          { status: 400, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      shopifyAPI = await getShopifyAPI(userId);
+      if (!shopifyAPI) {
+        return new Response(
+          JSON.stringify({ error: 'Shopify not connected' }),
+          { status: 401, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
     // Calculate date range
@@ -52,7 +66,7 @@ export async function POST(request: Request) {
           : 0;
 
         orderRecords.push({
-          user_id: userId,
+          user_id: userId || 'system',
           order_id: order.id.toString(),
           sku: lineItem.sku || null,
           product_id: lineItem.product_id.toString(),

@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase';
+import { supabase } from '../lib/supabase-server';
 
 // In-memory usage tracking for current session
 interface UsageEntry {

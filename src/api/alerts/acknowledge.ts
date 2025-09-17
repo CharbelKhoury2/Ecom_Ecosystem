@@ -1,4 +1,4 @@
-import { supabase } from '../../lib/supabase';
+import { supabase } from '../../lib/supabase-server';
 
 // Audit logging function
 async function logAuditEvent(actor: string, action: string, targetType: string, targetId: string, payload?: any) {

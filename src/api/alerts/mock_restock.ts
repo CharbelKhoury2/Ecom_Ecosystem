@@ -1,4 +1,4 @@
-import { supabase } from '../../lib/supabase';
+import { supabase } from '../../lib/supabase-server';
 
 // Audit logging function
 async function logAuditEvent(actor: string, action: string, targetType: string, targetId: string, payload?: any) {
@@ -21,7 +21,7 @@ async function logAuditEvent(actor: string, action: string, targetType: string, 
 async function triggerInventoryCheck(workspace_id: string) {
   try {
     // Call the inventory check API internally
-    const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/alerts/inventory`, {
+    const response = await fetch(`${process.env.VITE_APP_URL || 'http://localhost:3001'}/api/alerts/inventory`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -174,3 +174,6 @@ export async function POST(request: Request) {
     return new Response(
       JSON.stringify({ error: 'Internal server error' }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+}

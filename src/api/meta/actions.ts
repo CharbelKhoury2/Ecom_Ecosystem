@@ -1,5 +1,5 @@
 import { getMetaAdsAPI } from '../../lib/meta';
-import { supabase } from '../../lib/supabase';
+import { supabase } from '../../lib/supabase-server';
 
 export async function POST(request: Request) {
   try {

@@ -1,4 +1,4 @@
-import { supabase } from '../../lib/supabase';
+import { supabase, withRetry, testSupabaseConnection, mockAlerts } from '../../lib/supabase-server';
 
 // Audit logging function
 async function logAuditEvent(actor: string, action: string, targetType: string, targetId: string, payload?: any) {
@@ -28,19 +28,40 @@ export async function POST(request: Request) {
       );
     }
 
-    // Fetch all products for the workspace
-    const { data: products, error: productsError } = await supabase
-      .from('shopify_products')
-      .select('*')
-      .eq('workspace_id', workspace_id);
-
-    if (productsError) {
-      console.error('Error fetching products:', productsError);
+    // Test connection first
+    const isConnected = await testSupabaseConnection();
+    if (!isConnected) {
+      console.warn('Database unavailable for inventory check, returning mock response');
       return new Response(
-        JSON.stringify({ error: 'Failed to fetch products' }),
-        { status: 500, headers: { 'Content-Type': 'application/json' } }
+        JSON.stringify({
+          alerts: mockAlerts,
+          created: 0,
+          closed: 0,
+          products_checked: 0,
+          warning: 'Database unavailable, inventory check skipped',
+          summary: {
+            new_alerts_created: 0,
+            alerts_closed: 0,
+            total_open_alerts: mockAlerts.length
+          }
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
       );
     }
+
+    // Fetch all products for the workspace with retry
+    const products = await withRetry(async () => {
+      const { data, error } = await supabase
+        .from('shopify_products')
+        .select('*')
+        .eq('workspace_id', workspace_id);
+
+      if (error) {
+        throw error;
+      }
+
+      return data;
+    });
 
     if (!products || products.length === 0) {
       return new Response(
@@ -242,31 +263,52 @@ export async function GET(request: Request) {
       );
     }
 
-    let query = supabase
-      .from('alerts')
-      .select('*')
-      .eq('workspace_id', workspace_id);
-
-    if (status) {
-      query = query.eq('status', status);
-    }
-    if (type) {
-      query = query.eq('type', type);
-    }
-    if (severity) {
-      query = query.eq('severity', severity);
-    }
-
-    const { data: alerts, error } = await query
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('Error fetching alerts:', error);
+    // Test connection first
+    const isConnected = await testSupabaseConnection();
+    if (!isConnected) {
+      console.warn('Database unavailable, returning mock data');
+      const filteredMockAlerts = mockAlerts.filter(alert => {
+        if (status && alert.status !== status) return false;
+        if (type && alert.type !== type) return false;
+        if (severity && alert.severity !== severity) return false;
+        return true;
+      });
+      
       return new Response(
-        JSON.stringify({ error: 'Failed to fetch alerts' }),
-        { status: 500, headers: { 'Content-Type': 'application/json' } }
+        JSON.stringify({ 
+          alerts: filteredMockAlerts,
+          warning: 'Database unavailable, showing mock data'
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
       );
     }
+
+    // Use retry wrapper for database operations
+    const alerts = await withRetry(async () => {
+      let query = supabase
+        .from('alerts')
+        .select('*')
+        .eq('workspace_id', workspace_id);
+
+      if (status) {
+        query = query.eq('status', status);
+      }
+      if (type) {
+        query = query.eq('type', type);
+      }
+      if (severity) {
+        query = query.eq('severity', severity);
+      }
+
+      const { data, error } = await query
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        throw error;
+      }
+
+      return data;
+    });
 
     return new Response(
       JSON.stringify({ alerts: alerts || [] }),
@@ -274,9 +316,27 @@ export async function GET(request: Request) {
     );
   } catch (error) {
     console.error('Get alerts error:', error);
+    
+    // Fallback to mock data on error
+    console.warn('Falling back to mock data due to error');
+    const filteredMockAlerts = mockAlerts.filter(alert => {
+      const status = new URL(request.url).searchParams.get('status') || 'open';
+      const type = new URL(request.url).searchParams.get('type');
+      const severity = new URL(request.url).searchParams.get('severity');
+      
+      if (status && alert.status !== status) return false;
+      if (type && alert.type !== type) return false;
+      if (severity && alert.severity !== severity) return false;
+      return true;
+    });
+    
     return new Response(
-      JSON.stringify({ error: 'Internal server error' }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
+      JSON.stringify({ 
+        alerts: filteredMockAlerts,
+        warning: 'Database error, showing mock data',
+        error: error.message
+      }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } }
     );
   }
 }

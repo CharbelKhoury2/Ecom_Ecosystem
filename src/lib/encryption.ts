@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 
-const ENCRYPTION_KEY = import.meta.env.VITE_ENCRYPTION_KEY || 'default-key-for-development-only-32';
+const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || process.env.VITE_ENCRYPTION_KEY || 'default-key-for-development-only-32';
 const ALGORITHM = 'aes-256-gcm';
 
 export function encrypt(text: string): string {

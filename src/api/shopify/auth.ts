@@ -1,4 +1,4 @@
-import { supabase } from '../../lib/supabase';
+import { supabase } from '../../lib/supabase-server';
 import { encrypt } from '../../lib/encryption';
 import { ShopifyAPI } from '../../lib/shopify';
 

@@ -26,7 +26,7 @@ const Layout: React.FC = () => {
 
   const navItems = [
     { path: '/', icon: BarChart3, label: 'Dashboard' },
-    { path: '/copilot', icon: MessageCircle, label: 'Copilot' },
+    { path: '/copilot', icon: MessageCircle, label: 'Neo AI' },
     { path: '/alerts', icon: AlertTriangle, label: 'Alerts' },
     { path: '/settings', icon: Settings, label: 'Settings' },
   ];

@@ -10,6 +10,8 @@ import { supabase } from '../lib/supabase';
 import { useErrorHandler, DataError } from '../utils/errorHandling';
 import { apiClient } from '../utils/apiClient';
 import { useNotificationHelpers } from './NotificationSystem';
+import MarkdownRenderer from './MarkdownRenderer';
+import DataVisualization from './DataVisualization';
 
 interface CopilotContext {
   recentMetrics?: {
@@ -279,9 +281,9 @@ const EnhancedCopilot: React.FC<EnhancedCopilotProps> = ({
               )}
             </div>
             <div>
-              <h1 className="text-xl font-semibold text-gray-900 dark:text-white">AI Copilot</h1>
+              <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Neo AI Assistant</h1>
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                {context?.lastSync ? `Last sync: ${format(new Date(context.lastSync), 'MMM d, h:mm a')}` : 'Ready to help'}
+                {context?.lastSync ? `Last sync: ${format(new Date(context.lastSync), 'MMM d, h:mm a')}` : 'Your intelligent business assistant'}
               </p>
             </div>
           </div>
@@ -313,10 +315,10 @@ const EnhancedCopilot: React.FC<EnhancedCopilotProps> = ({
           <div className="text-center py-12">
             <Bot className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-              Ask me anything about your store performance
+              Hi! I'm Neo, your AI business assistant
             </h2>
             <p className="text-gray-600 dark:text-gray-400 mb-6">
-              I can analyze your revenue, inventory, sales trends, and provide actionable insights based on your data
+              I can analyze your store performance, create visualizations, and provide actionable insights with rich formatting and interactive charts
             </p>
             
             {/* Contextual Quick Actions */}
@@ -355,9 +357,16 @@ const EnhancedCopilot: React.FC<EnhancedCopilotProps> = ({
                         : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700'
                     }`}
                   >
-                    <div className="whitespace-pre-wrap text-sm leading-relaxed">
-                      {message.content}
-                    </div>
+                    {message.type === 'user' ? (
+                      <div className="whitespace-pre-wrap text-sm leading-relaxed">
+                        {message.content}
+                      </div>
+                    ) : (
+                      <MarkdownRenderer 
+                        content={message.content}
+                        className="text-sm leading-relaxed"
+                      />
+                    )}
                     
                     {message.metadata?.tokens_used && (
                       <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
@@ -449,7 +458,7 @@ const EnhancedCopilot: React.FC<EnhancedCopilotProps> = ({
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyPress={handleKeyPress}
-              placeholder="Ask about your store performance, inventory, or get business insights..."
+              placeholder="Ask Neo about your business data, request charts and analysis, or get insights with rich formatting..."
               className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
               rows={1}
               style={{ minHeight: '44px', maxHeight: '120px' }}
@@ -472,7 +481,7 @@ const EnhancedCopilot: React.FC<EnhancedCopilotProps> = ({
         
         {context?.recentMetrics && (
           <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-            Context: {context.recentMetrics.revenue ? `$${context.recentMetrics.revenue.toLocaleString()} revenue` : ''}
+            Neo's Context: {context.recentMetrics.revenue ? `$${context.recentMetrics.revenue.toLocaleString()} revenue` : ''}
             {context.recentMetrics.orders ? ` • ${context.recentMetrics.orders} orders` : ''}
             {context.recentMetrics.alerts ? ` • ${context.recentMetrics.alerts} alerts` : ''}
           </div>
