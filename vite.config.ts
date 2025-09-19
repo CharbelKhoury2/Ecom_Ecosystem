@@ -2,14 +2,11 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 import { visualizer } from 'rollup-plugin-visualizer'
-import { splitVendorChunkPlugin } from 'vite'
 
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [
     react(),
-    // Split vendor chunks for better caching
-    splitVendorChunkPlugin(),
     // Bundle analyzer (only in build mode)
     process.env.ANALYZE && visualizer({
       filename: 'dist/stats.html',
