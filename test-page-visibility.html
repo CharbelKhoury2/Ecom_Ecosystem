@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Page Visibility</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        .test-container {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 30px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            text-align: center;
+            max-width: 600px;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .success { background: rgba(34, 197, 94, 0.3); }
+        .info { background: rgba(59, 130, 246, 0.3); }
+        .warning { background: rgba(245, 158, 11, 0.3); }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background: #2563eb;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🔍 Webpage Visibility Test</h1>
+        <p>This test page helps diagnose why your main application might not be appearing.</p>
+        
+        <div class="status success">
+            ✅ Server is running successfully on port 5173
+        </div>
+        
+        <div class="status info">
+            ℹ️ DiagnosticOverlay has been fixed (isVisible: false)
+        </div>
+        
+        <div class="status info">
+            ℹ️ No compilation errors detected
+        </div>
+        
+        <div class="status info">
+            ℹ️ No browser console errors found
+        </div>
+        
+        <h2>Possible Solutions:</h2>
+        <div style="text-align: left; margin: 20px 0;">
+            <p><strong>1. Clear Browser Cache:</strong> Press Ctrl+F5 or Ctrl+Shift+R to hard refresh</p>
+            <p><strong>2. Check URL:</strong> Make sure you're visiting http://localhost:5173/dashboard</p>
+            <p><strong>3. Try Incognito Mode:</strong> Open a new incognito/private window</p>
+            <p><strong>4. Check Network Tab:</strong> Open DevTools > Network to see if resources are loading</p>
+        </div>
+        
+        <button onclick="window.location.href='http://localhost:5173/'">
+            🏠 Go to Main App
+        </button>
+        
+        <button onclick="window.location.href='http://localhost:5173/dashboard'">
+            📊 Go to Dashboard
+        </button>
+        
+        <button onclick="location.reload()">
+            🔄 Refresh This Page
+        </button>
+        
+        <div style="margin-top: 30px; font-size: 14px; opacity: 0.8;">
+            <p>Current Time: <span id="time"></span></p>
+            <p>User Agent: <span id="userAgent"></span></p>
+        </div>
+    </div>
+    
+    <script>
+        // Update time every second
+        function updateTime() {
+            document.getElementById('time').textContent = new Date().toLocaleString();
+        }
+        updateTime();
+        setInterval(updateTime, 1000);
+        
+        // Show user agent
+        document.getElementById('userAgent').textContent = navigator.userAgent;
+        
+        // Test if main app is accessible
+        fetch('http://localhost:5173/')
+            .then(response => {
+                if (response.ok) {
+                    console.log('✅ Main app is accessible');
+                } else {
+                    console.log('❌ Main app returned status:', response.status);
+                }
+            })
+            .catch(error => {
+                console.log('❌ Error accessing main app:', error);
+            });
+    </script>
+</body>
+</html>

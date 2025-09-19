@@ -1,5 +1,6 @@
 import React from 'react';
 import { Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 type LoadingState = 'loading' | 'success' | 'error' | 'idle';
 
@@ -29,21 +30,38 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
     switch (state) {
       case 'loading':
         return (
-          <Loader2 
-            className={`${sizeClasses[size]} animate-spin text-blue-600 dark:text-blue-400`} 
-          />
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+          >
+            <Loader2 
+              className={`${sizeClasses[size]} text-blue-600 dark:text-blue-400`} 
+            />
+          </motion.div>
         );
       case 'success':
         return (
-          <CheckCircle2 
-            className={`${sizeClasses[size]} text-green-600 dark:text-green-400`} 
-          />
+          <motion.div
+            initial={{ scale: 0, rotate: -180 }}
+            animate={{ scale: 1, rotate: 0 }}
+            transition={{ duration: 0.5, ease: 'backOut' }}
+          >
+            <CheckCircle2 
+              className={`${sizeClasses[size]} text-green-600 dark:text-green-400`} 
+            />
+          </motion.div>
         );
       case 'error':
         return (
-          <AlertCircle 
-            className={`${sizeClasses[size]} text-red-600 dark:text-red-400`} 
-          />
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: [0, 1.2, 1] }}
+            transition={{ duration: 0.5 }}
+          >
+            <AlertCircle 
+              className={`${sizeClasses[size]} text-red-600 dark:text-red-400`} 
+            />
+          </motion.div>
         );
       default:
         return null;
@@ -68,14 +86,24 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
   }
 
   return (
-    <div className={`flex items-center justify-center space-x-2 ${className}`}>
+    <motion.div 
+      className={`flex items-center justify-center space-x-2 ${className}`}
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+    >
       {renderIcon()}
       {showMessage && (
-        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+        <motion.span 
+          className="text-sm font-medium text-gray-700 dark:text-gray-300"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.2, duration: 0.3 }}
+        >
           {message || getDefaultMessage()}
-        </span>
+        </motion.span>
       )}
-    </div>
+    </motion.div>
   );
 };
 
@@ -99,20 +127,116 @@ export const LoadingOverlay: React.FC<{
 };
 
 // Skeleton loader for content
-export const SkeletonLoader: React.FC<{
+interface SkeletonLoaderProps {
   lines?: number;
   className?: string;
-}> = ({ lines = 3, className = '' }) => {
+  width?: 'full' | 'half' | 'quarter' | 'three-quarters';
+  height?: 'auto' | 'medium' | 'tall';
+}
+
+export const SkeletonLoader: React.FC<SkeletonLoaderProps> = ({ 
+  lines = 3, 
+  className = '',
+  width = 'full',
+  height = 'auto'
+}) => {
+  const widthClass = width === 'full' ? 'w-full' : width === 'half' ? 'w-1/2' : width === 'quarter' ? 'w-1/4' : 'w-3/4';
+  const heightClass = height === 'auto' ? 'h-4' : height === 'tall' ? 'h-8' : 'h-6';
+
   return (
-    <div className={`animate-pulse space-y-3 ${className}`}>
+    <div className={`space-y-3 ${className}`}>
       {Array.from({ length: lines }).map((_, index) => (
-        <div
+        <motion.div 
           key={index}
-          className={`h-4 bg-gray-200 dark:bg-gray-700 rounded ${
-            index === lines - 1 ? 'w-3/4' : 'w-full'
-          }`}
+          className={`bg-gray-200 dark:bg-gray-700 rounded ${widthClass} ${heightClass} animate-shimmer`}
+          style={{
+            width: index === lines - 1 ? '75%' : '100%' // Last line is shorter
+          }}
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: index * 0.1, duration: 0.3 }}
         />
       ))}
     </div>
   );
 };
+
+// Enhanced skeleton components
+export const SkeletonCard: React.FC<{ className?: string }> = ({ className = '' }) => (
+  <motion.div 
+    className={`bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 ${className}`}
+    initial={{ opacity: 0, scale: 0.95 }}
+    animate={{ opacity: 1, scale: 1 }}
+    transition={{ duration: 0.3 }}
+  >
+    <div className="animate-shimmer space-y-4">
+      <div className="flex items-center space-x-3">
+        <div className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded-full" />
+        <div className="w-32 h-4 bg-gray-200 dark:bg-gray-700 rounded" />
+      </div>
+      <div className="w-24 h-8 bg-gray-200 dark:bg-gray-700 rounded" />
+      <div className="w-16 h-6 bg-gray-200 dark:bg-gray-700 rounded-full" />
+    </div>
+  </motion.div>
+);
+
+export const SkeletonChart: React.FC<{ className?: string }> = ({ className = '' }) => (
+  <motion.div 
+    className={`bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 ${className}`}
+    initial={{ opacity: 0, y: 20 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ duration: 0.4 }}
+  >
+    <div className="animate-shimmer space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="w-40 h-6 bg-gray-200 dark:bg-gray-700 rounded" />
+        <div className="w-6 h-6 bg-gray-200 dark:bg-gray-700 rounded" />
+      </div>
+      <div className="h-64 bg-gray-200 dark:bg-gray-700 rounded" />
+    </div>
+  </motion.div>
+);
+
+export const SkeletonTable: React.FC<{ rows?: number; className?: string }> = ({ 
+  rows = 5, 
+  className = '' 
+}) => (
+  <motion.div 
+    className={`bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden ${className}`}
+    initial={{ opacity: 0 }}
+    animate={{ opacity: 1 }}
+    transition={{ duration: 0.3 }}
+  >
+    <div className="animate-shimmer">
+      {/* Header */}
+      <div className="border-b border-gray-200 dark:border-gray-700 p-4">
+        <div className="grid grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-4 bg-gray-200 dark:bg-gray-700 rounded" />
+          ))}
+        </div>
+      </div>
+      
+      {/* Rows */}
+      {Array.from({ length: rows }).map((_, rowIndex) => (
+        <motion.div 
+          key={rowIndex}
+          className="border-b border-gray-100 dark:border-gray-700 p-4"
+          initial={{ opacity: 0, x: -10 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: rowIndex * 0.05, duration: 0.2 }}
+        >
+          <div className="grid grid-cols-4 gap-4">
+            {Array.from({ length: 4 }).map((_, colIndex) => (
+              <div 
+                key={colIndex} 
+                className="h-4 bg-gray-200 dark:bg-gray-700 rounded"
+                style={{ width: colIndex === 3 ? '60%' : '100%' }}
+              />
+            ))}
+          </div>
+        </motion.div>
+      ))}
+    </div>
+  </motion.div>
+);

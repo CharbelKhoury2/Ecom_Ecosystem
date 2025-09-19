@@ -1,4 +1,5 @@
 import { supabase, withRetry, testSupabaseConnection, mockAlerts } from '../../lib/supabase-server';
+import { alertNotificationIntegration } from '../../services/alertNotificationIntegration';
 
 // Audit logging function
 async function logAuditEvent(actor: string, action: string, targetType: string, targetId: string, payload?: any) {
@@ -170,6 +171,35 @@ export async function POST(request: Request) {
         for (const alertId of alertsToClose) {
           await logAuditEvent(actor, 'close', 'alert', alertId, { reason: 'inventory_recovered' });
         }
+        
+        // Send notifications for resolved alerts
+        if (alertsToClose.length > 0) {
+          try {
+            // Get the closed alerts data for notifications
+            const { data: closedAlerts } = await supabase
+              .from('alerts')
+              .select('*')
+              .in('id', alertsToClose);
+            
+            if (closedAlerts && closedAlerts.length > 0) {
+              // Initialize integration if not already done
+              await alertNotificationIntegration.initialize();
+              
+              // Send individual notifications for each resolved alert
+              for (const alert of closedAlerts) {
+                await alertNotificationIntegration.sendAlertResolvedNotification(alert);
+              }
+              
+              // If multiple alerts resolved, also send a bulk notification
+              if (closedAlerts.length > 1) {
+                await alertNotificationIntegration.sendBulkAlertNotification(closedAlerts, 'resolved');
+              }
+            }
+          } catch (notificationError) {
+            console.error('Error sending alert resolution notifications:', notificationError);
+            // Don't fail the API call if notifications fail
+          }
+        }
       }
     }
 
@@ -198,6 +228,27 @@ export async function POST(request: Request) {
           sku: alert.sku,
           severity: alert.severity
         });
+      }
+      
+      // Send notifications for new alerts
+      if (insertedAlerts.length > 0) {
+        try {
+          // Initialize integration if not already done
+          await alertNotificationIntegration.initialize();
+          
+          // Send individual notifications for each alert
+          for (const alert of insertedAlerts) {
+            await alertNotificationIntegration.sendInventoryAlertNotification(alert);
+          }
+          
+          // If multiple alerts, also send a bulk notification
+          if (insertedAlerts.length > 1) {
+            await alertNotificationIntegration.sendBulkAlertNotification(insertedAlerts, 'created');
+          }
+        } catch (notificationError) {
+          console.error('Error sending alert notifications:', notificationError);
+          // Don't fail the API call if notifications fail
+        }
       }
     }
 

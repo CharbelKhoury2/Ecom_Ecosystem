@@ -1,0 +1,233 @@
+groups:
+  - name: ecom_ecosystem_alerts
+    rules:
+      # Application Health Alerts
+      - alert: ApplicationDown
+        expr: up{job="ecom-app"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: ecom-app
+        annotations:
+          summary: "Ecom Ecosystem application is down"
+          description: "The main application has been down for more than 1 minute."
+
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          service: ecom-app
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is {{ $value }} errors per second for the last 5 minutes."
+
+      - alert: HighResponseTime
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+          service: ecom-app
+        annotations:
+          summary: "High response time detected"
+          description: "95th percentile response time is {{ $value }} seconds."
+
+      # System Resource Alerts
+      - alert: HighMemoryUsage
+        expr: (nodejs_memory_heap_used_bytes / nodejs_memory_heap_total_bytes) * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+          service: ecom-app
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage is {{ $value }}% of available heap."
+
+      - alert: HighCPUUsage
+        expr: rate(process_cpu_seconds_total[5m]) * 100 > 80
+        for: 10m
+        labels:
+          severity: warning
+          service: ecom-app
+        annotations:
+          summary: "High CPU usage"
+          description: "CPU usage is {{ $value }}% for the last 10 minutes."
+
+      - alert: DiskSpaceLow
+        expr: (node_filesystem_avail_bytes / node_filesystem_size_bytes) * 100 < 10
+        for: 5m
+        labels:
+          severity: critical
+          service: system
+        annotations:
+          summary: "Low disk space"
+          description: "Disk space is {{ $value }}% full."
+
+      # Database Alerts
+      - alert: DatabaseConnectionFailed
+        expr: database_connection_status != 1
+        for: 2m
+        labels:
+          severity: critical
+          service: database
+        annotations:
+          summary: "Database connection failed"
+          description: "Unable to connect to the database for more than 2 minutes."
+
+      - alert: SlowDatabaseQueries
+        expr: database_query_duration_seconds > 5
+        for: 5m
+        labels:
+          severity: warning
+          service: database
+        annotations:
+          summary: "Slow database queries detected"
+          description: "Database queries are taking {{ $value }} seconds on average."
+
+      # Business Metrics Alerts
+      - alert: LowOrderVolume
+        expr: rate(orders_total[1h]) < 0.1
+        for: 30m
+        labels:
+          severity: warning
+          service: business
+        annotations:
+          summary: "Low order volume"
+          description: "Order rate is {{ $value }} orders per second, which is below normal."
+
+      - alert: HighCartAbandonmentRate
+        expr: (cart_abandoned_total / cart_created_total) * 100 > 70
+        for: 15m
+        labels:
+          severity: warning
+          service: business
+        annotations:
+          summary: "High cart abandonment rate"
+          description: "Cart abandonment rate is {{ $value }}%."
+
+      - alert: PaymentFailureSpike
+        expr: rate(payment_failures_total[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          service: payment
+        annotations:
+          summary: "Payment failure spike detected"
+          description: "Payment failure rate is {{ $value }} failures per second."
+
+      # Security Alerts
+      - alert: SuspiciousLoginActivity
+        expr: rate(failed_login_attempts_total[5m]) > 10
+        for: 2m
+        labels:
+          severity: warning
+          service: security
+        annotations:
+          summary: "Suspicious login activity"
+          description: "Failed login rate is {{ $value }} attempts per second."
+
+      - alert: RateLimitExceeded
+        expr: rate(rate_limit_exceeded_total[5m]) > 1
+        for: 5m
+        labels:
+          severity: warning
+          service: security
+        annotations:
+          summary: "Rate limit frequently exceeded"
+          description: "Rate limit exceeded {{ $value }} times per second."
+
+      # External Service Alerts
+      - alert: StripeServiceDown
+        expr: stripe_api_status != 1
+        for: 5m
+        labels:
+          severity: critical
+          service: stripe
+        annotations:
+          summary: "Stripe API is down"
+          description: "Unable to connect to Stripe API for payment processing."
+
+      - alert: EmailServiceDown
+        expr: email_service_status != 1
+        for: 10m
+        labels:
+          severity: warning
+          service: email
+        annotations:
+          summary: "Email service is down"
+          description: "Email service has been unavailable for 10 minutes."
+
+      # Cache Alerts
+      - alert: RedisDown
+        expr: redis_up != 1
+        for: 2m
+        labels:
+          severity: warning
+          service: redis
+        annotations:
+          summary: "Redis is down"
+          description: "Redis cache service is unavailable."
+
+      - alert: HighCacheMissRate
+        expr: (redis_cache_misses_total / (redis_cache_hits_total + redis_cache_misses_total)) * 100 > 50
+        for: 10m
+        labels:
+          severity: warning
+          service: redis
+        annotations:
+          summary: "High cache miss rate"
+          description: "Cache miss rate is {{ $value }}%."
+
+  - name: infrastructure_alerts
+    rules:
+      # Container Alerts
+      - alert: ContainerHighMemory
+        expr: (container_memory_usage_bytes / container_spec_memory_limit_bytes) * 100 > 90
+        for: 5m
+        labels:
+          severity: warning
+          service: container
+        annotations:
+          summary: "Container memory usage high"
+          description: "Container {{ $labels.name }} memory usage is {{ $value }}%."
+
+      - alert: ContainerHighCPU
+        expr: rate(container_cpu_usage_seconds_total[5m]) * 100 > 80
+        for: 10m
+        labels:
+          severity: warning
+          service: container
+        annotations:
+          summary: "Container CPU usage high"
+          description: "Container {{ $labels.name }} CPU usage is {{ $value }}%."
+
+      - alert: ContainerRestarting
+        expr: rate(container_start_time_seconds[5m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+          service: container
+        annotations:
+          summary: "Container restarting frequently"
+          description: "Container {{ $labels.name }} has restarted {{ $value }} times in the last 5 minutes."
+
+      # Network Alerts
+      - alert: HighNetworkLatency
+        expr: probe_duration_seconds > 1
+        for: 5m
+        labels:
+          severity: warning
+          service: network
+        annotations:
+          summary: "High network latency"
+          description: "Network latency to {{ $labels.instance }} is {{ $value }} seconds."
+
+      - alert: SSLCertificateExpiring
+        expr: probe_ssl_earliest_cert_expiry - time() < 86400 * 7
+        for: 1h
+        labels:
+          severity: warning
+          service: ssl
+        annotations:
+          summary: "SSL certificate expiring soon"
+          description: "SSL certificate

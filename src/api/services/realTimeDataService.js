@@ -16,6 +16,14 @@ class RealTimeDataService {
     try {
       const shopifyAPI = getShopifyAPIFromEnv();
       if (!shopifyAPI) {
+        console.log('Shopify API not configured, using fallback data');
+        return this.getFallbackSalesData();
+      }
+
+      // Test connection first
+      const isConnected = await shopifyAPI.testConnection();
+      if (!isConnected) {
+        console.log('Shopify connection failed, using fallback data');
         return this.getFallbackSalesData();
       }
 
@@ -118,6 +126,14 @@ class RealTimeDataService {
     try {
       const shopifyAPI = getShopifyAPIFromEnv();
       if (!shopifyAPI) {
+        console.log('Shopify API not configured, using fallback inventory data');
+        return this.getFallbackInventoryData();
+      }
+
+      // Test connection first
+      const isConnected = await shopifyAPI.testConnection();
+      if (!isConnected) {
+        console.log('Shopify connection failed, using fallback inventory data');
         return this.getFallbackInventoryData();
       }
 

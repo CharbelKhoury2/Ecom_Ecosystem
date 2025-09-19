@@ -1,0 +1,108 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'ecom-ecosystem'
+    environment: 'production'
+
+rule_files:
+  - "alert_rules.yml"
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+
+scrape_configs:
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+    scrape_interval: 5s
+    metrics_path: /metrics
+
+  # Main application
+  - job_name: 'ecom-app'
+    static_configs:
+      - targets: ['ecom-app:3001']
+    scrape_interval: 10s
+    metrics_path: /api/health/metrics
+    scrape_timeout: 5s
+
+  # Node.js application metrics
+  - job_name: 'ecom-app-health'
+    static_configs:
+      - targets: ['ecom-app:3001']
+    scrape_interval: 30s
+    metrics_path: /api/health/detailed
+    scrape_timeout: 10s
+
+  # Nginx metrics
+  - job_name: 'nginx'
+    static_configs:
+      - targets: ['ecom-app:80']
+    scrape_interval: 15s
+    metrics_path: /nginx_status
+    scrape_timeout: 5s
+
+  # Redis metrics
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis:6379']
+    scrape_interval: 15s
+    metrics_path: /metrics
+
+  # PostgreSQL metrics
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres:5432']
+    scrape_interval: 30s
+
+  # System metrics (node_exporter)
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+    scrape_interval: 15s
+
+  # Docker container metrics
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+    scrape_interval: 15s
+    metrics_path: /metrics
+
+  # Custom business metrics
+  - job_name: 'business-metrics'
+    static_configs:
+      - targets: ['ecom-app:3001']
+    scrape_interval: 60s
+    metrics_path: /api/metrics/business
+    scrape_timeout: 10s
+
+  # API endpoint monitoring
+  - job_name: 'api-endpoints'
+    static_configs:
+      - targets: ['ecom-app:3001']
+    scrape_interval: 30s
+    metrics_path: /api/metrics/endpoints
+    scrape_timeout: 5s
+
+  # External service monitoring
+  - job_name: 'external-services'
+    static_configs:
+      - targets: ['ecom-app:3001']
+    scrape_interval: 120s
+    metrics_path: /api/metrics/external
+    scrape_timeout: 30s
+
+# Remote write configuration (for long-term storage)
+remote_write:
+  - url: "https://prometheus-remote-write-endpoint.com/api/v1/write"
+    basic_auth:
+      username: "${PROMETHEUS_REMOTE_WRITE_USERNAME}"
+      password: "${PROMETHEUS_REMOTE_WRITE_PASSWORD}"
+    queue_config:
+      max_samples_per_send: 1000
+      max_shards: 200
+      capacity: 2

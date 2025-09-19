@@ -1,617 +1,492 @@
 /**
- * Advanced Analytics Dashboard with enhanced data visualization and insights
+ * Advanced Analytics Dashboard with ML Insights
+ * Displays predictive analytics, anomaly detection, and performance benchmarking
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { 
-  TrendingUp, 
-  TrendingDown, 
-  DollarSign, 
-  ShoppingCart, 
-  Users, 
-  Package, 
-  Target,
-  Calendar,
-  Download,
-  Filter,
-  RefreshCw,
-  BarChart3,
-  PieChart,
-  LineChart,
-  Eye,
-  EyeOff
-} from 'lucide-react';
+import React, { useState, useEffect } from 'react';
 import {
-  LineChart as RechartsLineChart,
+  LineChart,
+  Line,
   AreaChart,
+  Area,
   BarChart,
-  PieChart as RechartsPieChart,
+  Bar,
+  ScatterChart,
+  Scatter,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   Legend,
   ResponsiveContainer,
-  Area,
-  Line,
-  Bar,
-  Cell,
-  Pie
+  PieChart,
+  Pie,
+  Cell
 } from 'recharts';
-import { format, subDays, startOfDay, endOfDay } from 'date-fns';
-import { useErrorHandler } from '../utils/errorHandling';
-import { apiClient } from '../utils/apiClient';
-import { useEnhancedNotificationHelpers } from './EnhancedNotificationSystem';
-
-interface MetricCard {
-  id: string;
-  title: string;
-  value: number;
-  previousValue?: number;
-  format: 'currency' | 'number' | 'percentage';
-  icon: React.ComponentType<any>;
-  trend?: 'up' | 'down' | 'neutral';
-  color: string;
-  visible: boolean;
-}
-
-interface ChartConfig {
-  id: string;
-  title: string;
-  type: 'line' | 'area' | 'bar' | 'pie';
-  dataKey: string;
-  color: string;
-  visible: boolean;
-  yAxisId?: string;
-}
+import {
+  TrendingUp,
+  TrendingDown,
+  AlertTriangle,
+  Target,
+  Brain,
+  BarChart3,
+  PieChart as PieChartIcon,
+  Activity,
+  Zap,
+  Eye,
+  Calendar,
+  Filter
+} from 'lucide-react';
+import { format, subDays, parseISO } from 'date-fns';
+import {
+  forecastSalesTrends,
+  forecastInventoryDemand,
+  detectAnomalies,
+  predictCustomerLifetimeValue,
+  ForecastData
+} from '../utils/predictiveAnalytics';
+import {
+  generateBusinessInsights,
+  BusinessInsight
+} from '../utils/recommendationEngine';
 
 interface AnalyticsData {
-  timeSeriesData: any[];
-  metrics: Record<string, number>;
-  comparisons: Record<string, { current: number; previous: number }>;
-  segments: any[];
-  insights: string[];
+  salesData: { date: string; revenue: number; orders: number; visitors: number }[];
+  productData: { sku: string; name: string; revenue: number; margin: number; sales: number }[];
+  customerData: { customerId: string; totalSpent: number; orderCount: number; lastOrder: string }[];
+  marketingData: { channel: string; spend: number; revenue: number; roas: number }[];
 }
 
-interface AdvancedAnalyticsDashboardProps {
-  userId?: string;
-  dateRange?: { start: Date; end: Date };
-  onExport?: (data: any) => void;
+interface MetricCard {
+  title: string;
+  value: string;
+  change: number;
+  trend: 'up' | 'down' | 'neutral';
+  icon: React.ReactNode;
+  color: string;
 }
 
-const AdvancedAnalyticsDashboard: React.FC<AdvancedAnalyticsDashboardProps> = ({
-  userId,
-  dateRange: propDateRange,
-  onExport
-}) => {
+const COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#8dd1e1', '#d084d0'];
+
+const AdvancedAnalyticsDashboard: React.FC = () => {
+  const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
+  const [insights, setInsights] = useState<BusinessInsight[]>([]);
+  const [salesForecast, setSalesForecast] = useState<ForecastData[]>([]);
+  const [anomalies, setAnomalies] = useState<{ index: number; value: number; severity: number }[]>([]);
+  const [selectedTimeRange, setSelectedTimeRange] = useState<'7d' | '30d' | '90d'>('30d');
+  const [selectedMetric, setSelectedMetric] = useState<'revenue' | 'orders' | 'visitors'>('revenue');
   const [loading, setLoading] = useState(true);
-  const [data, setData] = useState<AnalyticsData | null>(null);
-  const [dateRange, setDateRange] = useState({
-    start: subDays(new Date(), 30),
-    end: new Date()
-  });
-  const [selectedMetrics, setSelectedMetrics] = useState<string[]>([]);
-  const [chartConfigs, setChartConfigs] = useState<ChartConfig[]>([]);
-  const [viewMode, setViewMode] = useState<'overview' | 'detailed' | 'comparison'>('overview');
-  const [refreshing, setRefreshing] = useState(false);
-  
-  const { handleError } = useErrorHandler();
-  const { showSuccess, showError, showInfo } = useEnhancedNotificationHelpers();
 
-  // Default metric cards configuration
-  const defaultMetricCards: MetricCard[] = [
-    {
-      id: 'revenue',
-      title: 'Total Revenue',
-      value: 0,
-      format: 'currency',
-      icon: DollarSign,
-      color: 'bg-green-500',
-      visible: true
-    },
-    {
-      id: 'orders',
-      title: 'Total Orders',
-      value: 0,
-      format: 'number',
-      icon: ShoppingCart,
-      color: 'bg-blue-500',
-      visible: true
-    },
-    {
-      id: 'customers',
-      title: 'Unique Customers',
-      value: 0,
-      format: 'number',
-      icon: Users,
-      color: 'bg-purple-500',
-      visible: true
-    },
-    {
-      id: 'aov',
-      title: 'Average Order Value',
-      value: 0,
-      format: 'currency',
-      icon: Target,
-      color: 'bg-orange-500',
-      visible: true
-    },
-    {
-      id: 'conversion_rate',
-      title: 'Conversion Rate',
-      value: 0,
-      format: 'percentage',
-      icon: TrendingUp,
-      color: 'bg-indigo-500',
-      visible: true
-    },
-    {
-      id: 'inventory_turnover',
-      title: 'Inventory Turnover',
-      value: 0,
-      format: 'number',
-      icon: Package,
-      color: 'bg-teal-500',
-      visible: true
-    }
-  ];
-
-  const [metricCards, setMetricCards] = useState<MetricCard[]>(defaultMetricCards);
-
-  // Initialize chart configurations
   useEffect(() => {
-    const defaultCharts: ChartConfig[] = [
-      {
-        id: 'revenue_trend',
-        title: 'Revenue Trend',
-        type: 'area',
-        dataKey: 'revenue',
-        color: '#10B981',
-        visible: true
-      },
-      {
-        id: 'orders_trend',
-        title: 'Orders Trend',
-        type: 'line',
-        dataKey: 'orders',
-        color: '#3B82F6',
-        visible: true,
-        yAxisId: 'right'
-      },
-      {
-        id: 'customer_acquisition',
-        title: 'Customer Acquisition',
-        type: 'bar',
-        dataKey: 'new_customers',
-        color: '#8B5CF6',
-        visible: true
-      },
-      {
-        id: 'product_performance',
-        title: 'Product Performance',
-        type: 'pie',
-        dataKey: 'product_revenue',
-        color: '#F59E0B',
-        visible: true
-      }
-    ];
-    setChartConfigs(defaultCharts);
-  }, []);
+    loadAnalyticsData();
+  }, [selectedTimeRange]);
 
-  // Fetch analytics data
-  const fetchAnalyticsData = async () => {
-    if (!userId) return;
-    
+  const loadAnalyticsData = async () => {
     setLoading(true);
     try {
-      const response = await apiClient.get('/api/analytics/advanced', {
-        cache: true,
-        cacheTTL: 5 * 60 * 1000, // 5 minutes
-        validateResponse: (data: any) => data && typeof data === 'object'
-      });
+      // Simulate API call - replace with actual data fetching
+      const mockData = generateMockAnalyticsData();
+      setAnalyticsData(mockData);
       
-      const analyticsData: AnalyticsData = response.data;
-      setData(analyticsData);
+      // Generate insights
+      const businessInsights = generateBusinessInsights(
+        mockData.salesData,
+        mockData.productData,
+        mockData.customerData
+      );
+      setInsights(businessInsights);
       
-      // Update metric cards with real data
-      setMetricCards(prev => prev.map(card => {
-        const value = analyticsData.metrics[card.id] || 0;
-        const previousValue = analyticsData.comparisons[card.id]?.previous;
-        const currentValue = analyticsData.comparisons[card.id]?.current || value;
-        
-        let trend: 'up' | 'down' | 'neutral' = 'neutral';
-        if (previousValue !== undefined) {
-          if (currentValue > previousValue) trend = 'up';
-          else if (currentValue < previousValue) trend = 'down';
-        }
-        
-        return {
-          ...card,
-          value: currentValue,
-          previousValue,
-          trend
-        };
+      // Generate sales forecast
+      const historicalSales = mockData.salesData.map(d => ({
+        date: d.date,
+        quantity: d.revenue / 100 // Simplified conversion
       }));
+      const forecast = forecastSalesTrends(historicalSales, 14);
+      setSalesForecast(forecast);
+      
+      // Detect anomalies
+      const revenues = mockData.salesData.map(d => d.revenue);
+      const detectedAnomalies = detectAnomalies(revenues, 2);
+      setAnomalies(detectedAnomalies);
       
     } catch (error) {
-      await handleError(error as Error, {
-        component: 'AdvancedAnalyticsDashboard',
-        action: 'fetchAnalyticsData',
-        userId
-      }, {
-        retry: fetchAnalyticsData,
-        showNotification: true
-      });
+      console.error('Error loading analytics data:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  // Refresh data
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    showInfo('Refreshing Analytics', 'Updating your dashboard with the latest data...');
+  const generateMockAnalyticsData = (): AnalyticsData => {
+    const days = selectedTimeRange === '7d' ? 7 : selectedTimeRange === '30d' ? 30 : 90;
+    const salesData = [];
     
-    try {
-      await fetchAnalyticsData();
-      showSuccess('Analytics Updated', 'Your dashboard has been refreshed with the latest data.');
-    } catch (error) {
-      showError('Refresh Failed', 'Unable to update analytics data. Please try again.');
-    } finally {
-      setRefreshing(false);
-    }
-  };
-
-  // Export data
-  const handleExport = () => {
-    if (!data) return;
-    
-    const exportData = {
-      metrics: metricCards.reduce((acc, card) => {
-        acc[card.id] = {
-          title: card.title,
-          value: card.value,
-          previousValue: card.previousValue,
-          trend: card.trend
-        };
-        return acc;
-      }, {} as any),
-      timeSeriesData: data.timeSeriesData,
-      dateRange,
-      exportedAt: new Date().toISOString()
-    };
-    
-    if (onExport) {
-      onExport(exportData);
-    } else {
-      // Default export as JSON
-      const blob = new Blob([JSON.stringify(exportData, null, 2)], {
-        type: 'application/json'
+    for (let i = days - 1; i >= 0; i--) {
+      const date = format(subDays(new Date(), i), 'yyyy-MM-dd');
+      const baseRevenue = 5000 + Math.random() * 3000;
+      const seasonality = 1 + 0.3 * Math.sin((i / 7) * Math.PI); // Weekly seasonality
+      const trend = 1 + (days - i) * 0.01; // Slight upward trend
+      
+      salesData.push({
+        date,
+        revenue: Math.round(baseRevenue * seasonality * trend),
+        orders: Math.round((baseRevenue * seasonality * trend) / 120), // Avg order value ~$120
+        visitors: Math.round((baseRevenue * seasonality * trend) / 12) // 10% conversion rate
       });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `analytics-${format(new Date(), 'yyyy-MM-dd')}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
     }
     
-    showSuccess('Export Complete', 'Analytics data has been exported successfully.');
+    const productData = [
+      { sku: 'PROD001', name: 'Premium Widget', revenue: 25000, margin: 0.45, sales: 150 },
+      { sku: 'PROD002', name: 'Standard Widget', revenue: 18000, margin: 0.35, sales: 200 },
+      { sku: 'PROD003', name: 'Basic Widget', revenue: 12000, margin: 0.25, sales: 300 },
+      { sku: 'PROD004', name: 'Deluxe Kit', revenue: 30000, margin: 0.55, sales: 100 },
+      { sku: 'PROD005', name: 'Starter Pack', revenue: 8000, margin: 0.30, sales: 250 }
+    ];
+    
+    const customerData = [
+      { customerId: 'CUST001', totalSpent: 5000, orderCount: 12, lastOrder: '2024-01-15' },
+      { customerId: 'CUST002', totalSpent: 3200, orderCount: 8, lastOrder: '2024-01-14' },
+      { customerId: 'CUST003', totalSpent: 2800, orderCount: 6, lastOrder: '2024-01-13' },
+      { customerId: 'CUST004', totalSpent: 4500, orderCount: 10, lastOrder: '2024-01-12' },
+      { customerId: 'CUST005', totalSpent: 1800, orderCount: 4, lastOrder: '2024-01-11' }
+    ];
+    
+    const marketingData = [
+      { channel: 'Google Ads', spend: 5000, revenue: 15000, roas: 3.0 },
+      { channel: 'Facebook Ads', spend: 3000, revenue: 7500, roas: 2.5 },
+      { channel: 'Email Marketing', spend: 500, revenue: 2000, roas: 4.0 },
+      { channel: 'SEO', spend: 1000, revenue: 3000, roas: 3.0 },
+      { channel: 'Influencer', spend: 2000, revenue: 4000, roas: 2.0 }
+    ];
+    
+    return { salesData, productData, customerData, marketingData };
   };
 
-  // Toggle metric visibility
-  const toggleMetricVisibility = (metricId: string) => {
-    setMetricCards(prev => prev.map(card => 
-      card.id === metricId ? { ...card, visible: !card.visible } : card
-    ));
+  const calculateMetrics = (): MetricCard[] => {
+    if (!analyticsData) return [];
+    
+    const currentPeriod = analyticsData.salesData.slice(-7);
+    const previousPeriod = analyticsData.salesData.slice(-14, -7);
+    
+    const currentRevenue = currentPeriod.reduce((sum, d) => sum + d.revenue, 0);
+    const previousRevenue = previousPeriod.reduce((sum, d) => sum + d.revenue, 0);
+    const revenueChange = ((currentRevenue - previousRevenue) / previousRevenue) * 100;
+    
+    const currentOrders = currentPeriod.reduce((sum, d) => sum + d.orders, 0);
+    const previousOrders = previousPeriod.reduce((sum, d) => sum + d.orders, 0);
+    const ordersChange = ((currentOrders - previousOrders) / previousOrders) * 100;
+    
+    const currentVisitors = currentPeriod.reduce((sum, d) => sum + d.visitors, 0);
+    const previousVisitors = previousPeriod.reduce((sum, d) => sum + d.visitors, 0);
+    const visitorsChange = ((currentVisitors - previousVisitors) / previousVisitors) * 100;
+    
+    const conversionRate = (currentOrders / currentVisitors) * 100;
+    const previousConversionRate = (previousOrders / previousVisitors) * 100;
+    const conversionChange = conversionRate - previousConversionRate;
+    
+    return [
+      {
+        title: 'Revenue (7d)',
+        value: `$${currentRevenue.toLocaleString()}`,
+        change: revenueChange,
+        trend: revenueChange > 0 ? 'up' : revenueChange < 0 ? 'down' : 'neutral',
+        icon: <TrendingUp className="w-5 h-5" />,
+        color: 'text-green-600'
+      },
+      {
+        title: 'Orders (7d)',
+        value: currentOrders.toLocaleString(),
+        change: ordersChange,
+        trend: ordersChange > 0 ? 'up' : ordersChange < 0 ? 'down' : 'neutral',
+        icon: <BarChart3 className="w-5 h-5" />,
+        color: 'text-blue-600'
+      },
+      {
+        title: 'Visitors (7d)',
+        value: currentVisitors.toLocaleString(),
+        change: visitorsChange,
+        trend: visitorsChange > 0 ? 'up' : visitorsChange < 0 ? 'down' : 'neutral',
+        icon: <Eye className="w-5 h-5" />,
+        color: 'text-purple-600'
+      },
+      {
+        title: 'Conversion Rate',
+        value: `${conversionRate.toFixed(1)}%`,
+        change: conversionChange,
+        trend: conversionChange > 0 ? 'up' : conversionChange < 0 ? 'down' : 'neutral',
+        icon: <Target className="w-5 h-5" />,
+        color: 'text-orange-600'
+      }
+    ];
   };
 
-  // Toggle chart visibility
-  const toggleChartVisibility = (chartId: string) => {
-    setChartConfigs(prev => prev.map(chart => 
-      chart.id === chartId ? { ...chart, visible: !chart.visible } : chart
-    ));
+  const prepareChartData = () => {
+    if (!analyticsData) return [];
+    
+    return analyticsData.salesData.map((data, index) => {
+      const forecastPoint = salesForecast.find(f => f.date === data.date);
+      const isAnomaly = anomalies.some(a => a.index === index);
+      
+      return {
+        ...data,
+        forecast: forecastPoint?.predicted || null,
+        confidence: forecastPoint?.confidence || null,
+        isAnomaly,
+        displayDate: format(parseISO(data.date), 'MMM dd')
+      };
+    });
   };
 
-  // Format value based on type
-  const formatValue = (value: number, format: 'currency' | 'number' | 'percentage') => {
-    switch (format) {
-      case 'currency':
-        return new Intl.NumberFormat('en-US', {
-          style: 'currency',
-          currency: 'USD'
-        }).format(value);
-      case 'percentage':
-        return `${(value * 100).toFixed(1)}%`;
-      case 'number':
-        return new Intl.NumberFormat('en-US').format(value);
-      default:
-        return value.toString();
+  const getInsightIcon = (type: string) => {
+    switch (type) {
+      case 'opportunity': return <TrendingUp className="w-5 h-5 text-green-500" />;
+      case 'risk': return <AlertTriangle className="w-5 h-5 text-red-500" />;
+      case 'optimization': return <Zap className="w-5 h-5 text-yellow-500" />;
+      case 'trend': return <Activity className="w-5 h-5 text-blue-500" />;
+      default: return <Brain className="w-5 h-5 text-gray-500" />;
     }
   };
 
-  // Calculate percentage change
-  const calculatePercentageChange = (current: number, previous: number) => {
-    if (previous === 0) return 0;
-    return ((current - previous) / previous) * 100;
+  const getImpactColor = (impact: string) => {
+    switch (impact) {
+      case 'high': return 'border-l-red-500 bg-red-50';
+      case 'medium': return 'border-l-yellow-500 bg-yellow-50';
+      case 'low': return 'border-l-green-500 bg-green-50';
+      default: return 'border-l-gray-500 bg-gray-50';
+    }
   };
-
-  // Custom tooltip for charts
-  const CustomTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-white dark:bg-gray-800 p-3 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg">
-          <p className="text-sm font-medium text-gray-900 dark:text-white mb-2">
-            {format(new Date(label), 'MMM d, yyyy')}
-          </p>
-          {payload.map((entry: any, index: number) => (
-            <p key={index} className="text-sm" style={{ color: entry.color }}>
-              {entry.name}: {formatValue(entry.value, 'number')}
-            </p>
-          ))}
-        </div>
-      );
-    }
-    return null;
-  };
-
-  // Fetch data on component mount and when dependencies change
-  useEffect(() => {
-    if (userId) {
-      fetchAnalyticsData();
-    }
-  }, [userId, dateRange]);
-
-  // Update date range from props
-  useEffect(() => {
-    if (propDateRange) {
-      setDateRange(propDateRange);
-    }
-  }, [propDateRange]);
 
   if (loading) {
     return (
-      <div className="p-6 space-y-6 animate-pulse">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[...Array(6)].map((_, i) => (
-            <div key={i} className="bg-gray-200 dark:bg-gray-700 h-32 rounded-lg" />
-          ))}
-        </div>
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="bg-gray-200 dark:bg-gray-700 h-64 rounded-lg" />
-          ))}
-        </div>
+      <div className="flex items-center justify-center h-96">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
       </div>
     );
   }
 
+  const metrics = calculateMetrics();
+  const chartData = prepareChartData();
+
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+      <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white">
-            Advanced Analytics
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
-            Comprehensive insights and performance metrics
-          </p>
+          <h1 className="text-3xl font-bold text-gray-900">Advanced Analytics</h1>
+          <p className="text-gray-600 mt-1">AI-powered insights and predictive analytics</p>
         </div>
         
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-          {/* View Mode Toggle */}
-          <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
-            {(['overview', 'detailed', 'comparison'] as const).map((mode) => (
-              <button
-                key={mode}
-                onClick={() => setViewMode(mode)}
-                className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
-                  viewMode === mode
-                    ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
-                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-                }`}
-              >
-                {mode.charAt(0).toUpperCase() + mode.slice(1)}
-              </button>
-            ))}
-          </div>
+        <div className="flex space-x-4">
+          <select
+            value={selectedTimeRange}
+            onChange={(e) => setSelectedTimeRange(e.target.value as '7d' | '30d' | '90d')}
+            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
+            <option value="7d">Last 7 days</option>
+            <option value="30d">Last 30 days</option>
+            <option value="90d">Last 90 days</option>
+          </select>
           
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={handleExport}
-              className="btn-outline text-sm"
-              title="Export data"
-            >
-              <Download className="h-4 w-4 mr-2" />
-              Export
-            </button>
-            
-            <button
-              onClick={handleRefresh}
-              disabled={refreshing}
-              className="btn-primary text-sm"
-            >
-              <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-              {refreshing ? 'Refreshing...' : 'Refresh'}
-            </button>
-          </div>
+          <select
+            value={selectedMetric}
+            onChange={(e) => setSelectedMetric(e.target.value as 'revenue' | 'orders' | 'visitors')}
+            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
+            <option value="revenue">Revenue</option>
+            <option value="orders">Orders</option>
+            <option value="visitors">Visitors</option>
+          </select>
         </div>
       </div>
 
-      {/* Metric Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {metricCards.filter(card => card.visible).map((card) => {
-          const Icon = card.icon;
-          const percentageChange = card.previousValue 
-            ? calculatePercentageChange(card.value, card.previousValue)
-            : 0;
-          
-          return (
-            <div key={card.id} className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className={`p-2 rounded-lg ${card.color} bg-opacity-10`}>
-                    <Icon className={`h-6 w-6 ${card.color.replace('bg-', 'text-')}`} />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                      {card.title}
-                    </p>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {formatValue(card.value, card.format)}
-                    </p>
-                  </div>
-                </div>
-                
-                <button
-                  onClick={() => toggleMetricVisibility(card.id)}
-                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
-                >
-                  <Eye className="h-4 w-4" />
-                </button>
+      {/* Key Metrics */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {metrics.map((metric, index) => (
+          <div key={index} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between">
+              <div className={metric.color}>
+                {metric.icon}
               </div>
-              
-              {card.previousValue !== undefined && (
-                <div className="mt-4 flex items-center space-x-2">
-                  {card.trend === 'up' ? (
-                    <TrendingUp className="h-4 w-4 text-green-500" />
-                  ) : card.trend === 'down' ? (
-                    <TrendingDown className="h-4 w-4 text-red-500" />
-                  ) : null}
-                  <span className={`text-sm font-medium ${
-                    card.trend === 'up' ? 'text-green-600' :
-                    card.trend === 'down' ? 'text-red-600' :
-                    'text-gray-600 dark:text-gray-400'
-                  }`}>
-                    {percentageChange > 0 ? '+' : ''}{percentageChange.toFixed(1)}%
-                  </span>
-                  <span className="text-sm text-gray-500 dark:text-gray-400">
-                    vs previous period
-                  </span>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Charts Grid */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        {chartConfigs.filter(chart => chart.visible).map((chart) => (
-          <div key={chart.id} className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-            <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  {chart.title}
-                </h3>
-                <button
-                  onClick={() => toggleChartVisibility(chart.id)}
-                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
-                >
-                  <EyeOff className="h-4 w-4" />
-                </button>
+              <div className={`flex items-center text-sm ${
+                metric.trend === 'up' ? 'text-green-600' : 
+                metric.trend === 'down' ? 'text-red-600' : 'text-gray-600'
+              }`}>
+                {metric.trend === 'up' ? <TrendingUp className="w-4 h-4 mr-1" /> :
+                 metric.trend === 'down' ? <TrendingDown className="w-4 h-4 mr-1" /> : null}
+                {Math.abs(metric.change).toFixed(1)}%
               </div>
             </div>
-            
-            <div className="p-6">
-              <ResponsiveContainer width="100%" height={300}>
-                {chart.type === 'line' && (
-                  <RechartsLineChart data={data?.timeSeriesData || []}>
-                    <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                    <XAxis 
-                      dataKey="date" 
-                      tickFormatter={(value) => format(new Date(value), 'MMM d')}
-                      className="text-xs"
-                    />
-                    <YAxis yAxisId={chart.yAxisId || 'left'} className="text-xs" />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Line 
-                      yAxisId={chart.yAxisId || 'left'}
-                      type="monotone" 
-                      dataKey={chart.dataKey} 
-                      stroke={chart.color} 
-                      strokeWidth={2}
-                      dot={{ fill: chart.color, strokeWidth: 2, r: 4 }}
-                      activeDot={{ r: 6, stroke: chart.color, strokeWidth: 2 }}
-                    />
-                  </RechartsLineChart>
-                )}
-                
-                {chart.type === 'area' && (
-                  <AreaChart data={data?.timeSeriesData || []}>
-                    <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                    <XAxis 
-                      dataKey="date" 
-                      tickFormatter={(value) => format(new Date(value), 'MMM d')}
-                      className="text-xs"
-                    />
-                    <YAxis className="text-xs" />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Area 
-                      type="monotone" 
-                      dataKey={chart.dataKey} 
-                      stroke={chart.color} 
-                      fill={chart.color}
-                      fillOpacity={0.3}
-                      strokeWidth={2}
-                    />
-                  </AreaChart>
-                )}
-                
-                {chart.type === 'bar' && (
-                  <BarChart data={data?.timeSeriesData || []}>
-                    <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                    <XAxis 
-                      dataKey="date" 
-                      tickFormatter={(value) => format(new Date(value), 'MMM d')}
-                      className="text-xs"
-                    />
-                    <YAxis className="text-xs" />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Bar dataKey={chart.dataKey} fill={chart.color} radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                )}
-                
-                {chart.type === 'pie' && (
-                  <RechartsPieChart>
-                    <Pie
-                      data={data?.segments || []}
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={100}
-                      fill={chart.color}
-                      dataKey={chart.dataKey}
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                    >
-                      {(data?.segments || []).map((entry: any, index: number) => (
-                        <Cell key={`cell-${index}`} fill={`hsl(${index * 45}, 70%, 50%)`} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </RechartsPieChart>
-                )}
-              </ResponsiveContainer>
+            <div className="mt-4">
+              <h3 className="text-sm font-medium text-gray-600">{metric.title}</h3>
+              <p className="text-2xl font-bold text-gray-900 mt-1">{metric.value}</p>
             </div>
           </div>
         ))}
       </div>
 
-      {/* Insights Section */}
-      {data?.insights && data.insights.length > 0 && (
-        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
-          <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-100 mb-4">
-            Key Insights
-          </h3>
-          <ul className="space-y-2">
-            {data.insights.map((insight, index) => (
-              <li key={index} className="text-blue-800 dark:text-blue-200 text-sm">
-                • {insight}
-              </li>
-            ))}
-          </ul>
+      {/* Main Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Sales Trend with Forecast */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">Sales Trend &amp; Forecast</h3>
+            <Brain className="w-5 h-5 text-blue-500" />
+          </div>
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={chartData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="displayDate" />
+              <YAxis />
+              <Tooltip 
+                formatter={(value, name) => [
+                  typeof value === 'number' ? `$${value.toLocaleString()}` : value,
+                  name === 'revenue' ? 'Actual Revenue' : 
+                  name === 'forecast' ? 'Predicted Revenue' : name
+                ]}
+              />
+              <Legend />
+              <Line 
+                type="monotone" 
+                dataKey={selectedMetric} 
+                stroke="#3B82F6" 
+                strokeWidth={2}
+                name="Actual"
+              />
+              {salesForecast.length > 0 && (
+                <Line 
+                  type="monotone" 
+                  dataKey="forecast" 
+                  stroke="#10B981" 
+                  strokeWidth={2}
+                  strokeDasharray="5 5"
+                  name="Forecast"
+                />
+              )}
+            </LineChart>
+          </ResponsiveContainer>
         </div>
-      )}
+
+        {/* Anomaly Detection */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">Anomaly Detection</h3>
+            <AlertTriangle className="w-5 h-5 text-red-500" />
+          </div>
+          <ResponsiveContainer width="100%" height={300}>
+            <ScatterChart data={chartData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="displayDate" />
+              <YAxis />
+              <Tooltip 
+                formatter={(value) => [`$${value.toLocaleString()}`, 'Revenue']}
+                labelFormatter={(label) => `Date: ${label}`}
+              />
+              <Scatter 
+                dataKey={selectedMetric} 
+                fill={(entry: any) => entry.isAnomaly ? '#EF4444' : '#3B82F6'}
+              />
+            </ScatterChart>
+          </ResponsiveContainer>
+          <div className="mt-4 text-sm text-gray-600">
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center">
+                <div className="w-3 h-3 bg-blue-500 rounded-full mr-2"></div>
+                Normal
+              </div>
+              <div className="flex items-center">
+                <div className="w-3 h-3 bg-red-500 rounded-full mr-2"></div>
+                Anomaly
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Product Performance & Marketing ROI */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Top Products */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Top Products by Revenue</h3>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={analyticsData?.productData || []}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} />
+              <YAxis />
+              <Tooltip formatter={(value) => [`$${value.toLocaleString()}`, 'Revenue']} />
+              <Bar dataKey="revenue" fill="#8884d8" />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Marketing ROI */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Marketing Channel ROI</h3>
+          <ResponsiveContainer width="100%" height={300}>
+            <PieChart>
+              <Pie
+                data={analyticsData?.marketingData || []}
+                cx="50%"
+                cy="50%"
+                labelLine={false}
+                label={({ channel, roas }) => `${channel}: ${roas.toFixed(1)}x`}
+                outerRadius={80}
+                fill="#8884d8"
+                dataKey="revenue"
+              >
+                {(analyticsData?.marketingData || []).map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip formatter={(value) => [`$${value.toLocaleString()}`, 'Revenue']} />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* AI Insights */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-lg font-semibold text-gray-900">AI-Powered Business Insights</h3>
+          <Brain className="w-5 h-5 text-blue-500" />
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {insights.map((insight) => (
+            <div 
+              key={insight.id} 
+              className={`border-l-4 p-4 rounded-r-lg ${getImpactColor(insight.impact)}`}
+            >
+              <div className="flex items-start space-x-3">
+                {getInsightIcon(insight.type)}
+                <div className="flex-1">
+                  <h4 className="font-semibold text-gray-900 mb-1">{insight.title}</h4>
+                  <p className="text-sm text-gray-700 mb-2">{insight.description}</p>
+                  
+                  {insight.metrics && (
+                    <div className="text-xs text-gray-600 mb-2">
+                      Current: {insight.metrics.current.toLocaleString()} {insight.metrics.unit} → 
+                      Potential: {insight.metrics.potential.toLocaleString()} {insight.metrics.unit}
+                    </div>
+                  )}
+                  
+                  {insight.recommendations && (
+                    <div className="mt-2">
+                      <p className="text-xs font-medium text-gray-600 mb-1">Recommendations:</p>
+                      <ul className="text-xs text-gray-600 space-y-1">
+                        {insight.recommendations.slice(0, 2).map((rec, index) => (
+                          <li key={index} className="flex items-start">
+                            <span className="mr-1">•</span>
+                            <span>{rec}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 };

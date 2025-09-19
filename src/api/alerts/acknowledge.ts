@@ -1,21 +1,8 @@
-import { supabase } from '../../lib/supabase-server';
+import { supabase } from '../../lib/supabase';
+import { logAuditEvent } from '../../utils/auditLogger';
+import { alertNotificationIntegration } from '../../services/alertNotificationIntegration';
 
-// Audit logging function
-async function logAuditEvent(actor: string, action: string, targetType: string, targetId: string, payload?: any) {
-  try {
-    await supabase
-      .from('audit_logs')
-      .insert({
-        actor,
-        action,
-        target_type: targetType,
-        target_id: targetId,
-        payload: payload || null
-      });
-  } catch (error) {
-    console.error('Failed to log audit event:', error);
-  }
-}
+
 
 export async function PATCH(request: Request) {
   try {
@@ -90,12 +77,19 @@ export async function PATCH(request: Request) {
       );
     }
 
-    // Log the acknowledgment audit event
+    // Log the acknowledgment
     await logAuditEvent(acknowledged_by, 'acknowledge', 'alert', alertId, {
-      alert_type: existingAlert.type,
-      sku: existingAlert.sku,
-      severity: existingAlert.severity
+      previous_status: existingAlert.status
     });
+    
+    // Send notification for alert acknowledgment
+    try {
+      await alertNotificationIntegration.initialize();
+      await alertNotificationIntegration.sendAlertAcknowledgedNotification(updatedAlert, acknowledged_by);
+    } catch (notificationError) {
+      console.error('Error sending alert acknowledgment notification:', notificationError);
+      // Don't fail the API call if notifications fail
+    }
 
     return new Response(
       JSON.stringify({

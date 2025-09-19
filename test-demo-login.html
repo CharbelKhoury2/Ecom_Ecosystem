@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Demo Login</title>
+</head>
+<body>
+    <h1>Demo Login Test</h1>
+    <p>This page will automatically test the demo login functionality.</p>
+    <div id="status">Testing...</div>
+    
+    <script>
+        // Test if the main app is accessible
+        fetch('http://localhost:5173/')
+            .then(response => {
+                if (response.ok) {
+                    document.getElementById('status').innerHTML = 'App is accessible. Opening login page...';
+                    // Open the login page
+                    window.open('http://localhost:5173/login', '_blank');
+                } else {
+                    document.getElementById('status').innerHTML = 'App is not accessible: ' + response.status;
+                }
+            })
+            .catch(error => {
+                document.getElementById('status').innerHTML = 'Error accessing app: ' + error.message;
+            });
+    </script>
+</body>
+</html>

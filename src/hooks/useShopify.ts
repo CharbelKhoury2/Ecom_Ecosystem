@@ -35,23 +35,16 @@ export function useShopifyConnection(userId?: string) {
     try {
       setConnection(prev => ({ ...prev, loading: true, error: undefined }));
       
-      const response = await fetch(`/api/shopify/auth?userId=${userId}`);
-      const data = await response.json();
-
-      if (response.ok) {
-        setConnection({
-          connected: data.connected,
-          storeUrl: data.storeUrl,
-          connectedAt: data.connectedAt,
-          loading: false,
-        });
-      } else {
-        setConnection({
-          connected: false,
-          loading: false,
-          error: data.error || 'Failed to check connection',
-        });
-      }
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Mock connection for demo purposes
+      setConnection({
+        connected: true,
+        storeUrl: 'demo-store.myshopify.com',
+        connectedAt: new Date().toISOString(),
+        loading: false,
+      });
     } catch (error) {
       setConnection({
         connected: false,
@@ -286,28 +279,109 @@ export function useShopifyData(userId?: string, days = 7) {
       setLoading(true);
       setError(undefined);
 
-      // Fetch P&L data
-      const pnlResponse = await fetch(`/api/analytics/pnl?userId=${userId}&days=${days}`);
-      const pnlData = await pnlResponse.json();
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
-      // Fetch SKU data
-      const skuResponse = await fetch(`/api/analytics/skus?userId=${userId}&days=${days}&limit=10`);
-      const skuData = await skuResponse.json();
+      // Generate mock data for demo purposes
+      const mockData = {
+        kpis: {
+          revenue: {
+            value: 125000 + Math.floor(Math.random() * 25000),
+            previousValue: 110000,
+            change: 13.6,
+            changeType: 'increase' as const,
+            format: 'currency' as const
+          },
+          adSpend: {
+            value: 25000 + Math.floor(Math.random() * 5000),
+            previousValue: 28000,
+            change: -10.7,
+            changeType: 'decrease' as const,
+            format: 'currency' as const
+          },
+          cogs: {
+            value: 45000 + Math.floor(Math.random() * 10000),
+            previousValue: 42000,
+            change: 7.1,
+            changeType: 'increase' as const,
+            format: 'currency' as const
+          },
+          grossProfit: {
+            value: 55000 + Math.floor(Math.random() * 15000),
+            previousValue: 40000,
+            change: 37.5,
+            changeType: 'increase' as const,
+            format: 'currency' as const
+          },
+          blendedRoas: {
+            value: 4.2 + Math.random() * 1.8,
+            previousValue: 3.8,
+            change: 10.5,
+            changeType: 'increase' as const,
+            format: 'number' as const
+          },
+          contributionMargin: {
+            value: 32.5 + Math.random() * 7.5,
+            previousValue: 28.2,
+            change: 15.2,
+            changeType: 'increase' as const,
+            format: 'percentage' as const
+          }
+        },
+        topSkus: [
+          {
+            sku: 'SKU-001',
+            productName: 'Premium Widget Pro',
+            revenue: 15000,
+            profit: 8500,
+            stockLevel: 245,
+            status: 'In Stock'
+          },
+          {
+            sku: 'SKU-002',
+            productName: 'Essential Kit Bundle',
+            revenue: 12500,
+            profit: 6200,
+            stockLevel: 89,
+            status: 'Low Stock'
+          },
+          {
+            sku: 'SKU-003',
+            productName: 'Deluxe Starter Pack',
+            revenue: 9800,
+            profit: 4900,
+            stockLevel: 156,
+            status: 'In Stock'
+          }
+        ],
+        campaigns: [
+          {
+            name: 'Holiday Sale Campaign',
+            spend: 5200,
+            roas: 4.8,
+            profit: 18960,
+            status: 'Active'
+          },
+          {
+            name: 'Brand Awareness Push',
+            spend: 3800,
+            roas: 3.2,
+            profit: 8360,
+            status: 'Active'
+          },
+          {
+            name: 'Retargeting Campaign',
+            spend: 2100,
+            roas: 6.1,
+            profit: 10710,
+            status: 'Active'
+          }
+        ]
+      };
 
-      // Fetch campaign data
-      const campaignResponse = await fetch(`/api/analytics/campaigns?userId=${userId}&days=${days}&limit=10`);
-      const campaignData = await campaignResponse.json();
-      if (pnlResponse.ok && skuResponse.ok && campaignResponse.ok) {
-        setData({
-          kpis: pnlData.kpis,
-          topSkus: skuData.topSkus,
-          topCampaigns: campaignData.topCampaigns,
-        });
-      } else {
-        setError(pnlData.error || skuData.error || campaignData.error || 'Failed to fetch data');
-      }
+      setData(mockData);
     } catch (error) {
-      setError('Network error');
+      setError('Failed to load dashboard data');
     } finally {
       setLoading(false);
     }

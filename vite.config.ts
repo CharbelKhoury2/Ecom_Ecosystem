@@ -1,60 +1,91 @@
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
-import { resolve } from 'path';
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+import path from 'path'
+import { visualizer } from 'rollup-plugin-visualizer'
+import { splitVendorChunkPlugin } from 'vite'
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [react()],
-  
-  // Path resolution
+  plugins: [
+    react(),
+    // Split vendor chunks for better caching
+    splitVendorChunkPlugin(),
+    // Bundle analyzer (only in build mode)
+    process.env.ANALYZE && visualizer({
+      filename: 'dist/stats.html',
+      open: true,
+      gzipSize: true,
+      brotliSize: true
+    })
+  ].filter(Boolean),
   resolve: {
     alias: {
-      '@': resolve(__dirname, 'src'),
+      '@': path.resolve(__dirname, './src'),
     },
   },
-  
-  // Dependency optimization
-  optimizeDeps: {
-    exclude: ['lucide-react'],
-    include: [
-      'react',
-      'react-dom',
-      'react-router-dom',
-      'zustand',
-    ],
+  server: {
+    port: 5173,
+    host: true,
+    // Enable HTTP/2
+    https: false,
+    // Optimize dev server
+    hmr: {
+      overlay: true
+    }
   },
-  
-  // Build optimizations
   build: {
-    // Enable source maps for production debugging
-    sourcemap: true,
-    
+    // Target modern browsers for smaller bundles
+    target: 'es2020',
+    // Enable minification
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        // Remove console.log in production
+        drop_console: true,
+        drop_debugger: true,
+        // Remove unused code
+        dead_code: true,
+        // Optimize comparisons
+        comparisons: true,
+        // Optimize conditionals
+        conditionals: true,
+        // Optimize loops
+        loops: true,
+        // Remove unused variables
+        unused: true
+      },
+      mangle: {
+        // Mangle function names for smaller size
+        toplevel: true
+      },
+      format: {
+        // Remove comments
+        comments: false
+      }
+    },
     // Optimize chunk splitting
     rollupOptions: {
       output: {
         // Manual chunk splitting for better caching
         manualChunks: {
-          // Vendor chunks
-          'react-vendor': ['react', 'react-dom'],
-          'router-vendor': ['react-router-dom'],
-          'ui-vendor': ['lucide-react'],
-          
-          // Feature chunks
-          'dashboard': ['./src/pages/Dashboard.tsx'],
-          'copilot': ['./src/pages/Copilot.tsx'],
-          'alerts': ['./src/pages/Alerts.tsx'],
-          'settings': ['./src/pages/Settings.tsx'],
+          // React ecosystem
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          // UI libraries
+          'ui-vendor': ['framer-motion', 'lucide-react', 'sonner'],
+          // Chart libraries
+          'chart-vendor': ['recharts'],
+          // Date utilities
+          'date-vendor': ['date-fns'],
+          // Utility libraries
+          'utils-vendor': ['zustand', 'clsx']
         },
-        
         // Optimize chunk file names
         chunkFileNames: (chunkInfo) => {
           const facadeModuleId = chunkInfo.facadeModuleId
-            ? chunkInfo.facadeModuleId.split('/').pop()?.replace('.tsx', '').replace('.ts', '')
+            ? chunkInfo.facadeModuleId.split('/').pop()?.replace(/\.[^.]*$/, '') || 'chunk'
             : 'chunk';
           return `js/${facadeModuleId}-[hash].js`;
         },
-        
-        // Optimize asset file names
         assetFileNames: (assetInfo) => {
           const info = assetInfo.name?.split('.') || [];
           const ext = info[info.length - 1];
@@ -64,57 +95,78 @@ export default defineConfig({
           if (/css/i.test(ext || '')) {
             return `css/[name]-[hash][extname]`;
           }
+          if (/woff2?|eot|ttf|otf/i.test(ext || '')) {
+            return `fonts/[name]-[hash][extname]`;
+          }
           return `assets/[name]-[hash][extname]`;
-        },
+        }
       },
+      // External dependencies (if using CDN)
+      external: process.env.USE_CDN ? [
+        // 'react',
+        // 'react-dom'
+      ] : []
     },
-    
-    // Minification options
-    minify: 'terser',
-    terserOptions: {
-      compress: {
-        drop_console: true, // Remove console.log in production
-        drop_debugger: true,
-      },
-    },
-    
-    // Chunk size warnings
+    // Source maps for debugging
+    sourcemap: process.env.NODE_ENV === 'development',
+    // Optimize CSS
+    cssCodeSplit: true,
+    // Report compressed file sizes
+    reportCompressedSize: true,
+    // Chunk size warning limit
     chunkSizeWarningLimit: 1000,
-    
-    // Target modern browsers for smaller bundles
-    target: 'esnext',
+    // Output directory
+    outDir: 'dist',
+    // Assets directory
+    assetsDir: 'assets',
+    // Clean output directory before build
+    emptyOutDir: true
   },
-  
-  // Development server optimizations
-  server: {
-    // Enable HMR
-    hmr: true,
-    
-    // Proxy API requests to backend server
-    proxy: {
-      '/api': {
-        target: 'http://localhost:3001',
-        changeOrigin: true,
-        secure: false,
-      },
+  // Optimize dependencies
+  optimizeDeps: {
+    include: [
+      'react',
+      'react-dom',
+      'react-router-dom',
+      'framer-motion',
+      'lucide-react',
+      'recharts',
+      'date-fns',
+      'zustand',
+      'sonner'
+    ],
+    exclude: [
+      // Exclude large dependencies that should be loaded dynamically
+    ]
+  },
+  // CSS optimization
+  css: {
+    // Enable CSS modules
+    modules: {
+      localsConvention: 'camelCase'
     },
-    
-    // Optimize dev dependencies
-    fs: {
-      // Allow serving files from one level up to the project root
-      allow: ['..'],
+    // PostCSS configuration
+    postcss: {
+      plugins: [
+        // Add autoprefixer and other PostCSS plugins as needed
+      ]
     },
+    // CSS preprocessing
+    preprocessorOptions: {
+      scss: {
+        // SCSS options if using SCSS
+      }
+    }
   },
-  
-  // Preview server configuration
-  preview: {
-    port: 4173,
-    strictPort: true,
-  },
-  
   // Environment variables
   define: {
     __DEV__: JSON.stringify(process.env.NODE_ENV === 'development'),
     __PROD__: JSON.stringify(process.env.NODE_ENV === 'production'),
+    __VERSION__: JSON.stringify(process.env.npm_package_version || '1.0.0')
   },
-});
+  // Preview server configuration
+  preview: {
+    port: 4173,
+    host: true
+  }
+})
