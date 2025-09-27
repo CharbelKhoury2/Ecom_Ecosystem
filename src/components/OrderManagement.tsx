@@ -288,7 +288,7 @@ const OrderManagement: React.FC = () => {
 
   // Filter and sort orders
   const filteredOrders = useMemo(() => {
-    let filtered = orders.filter(order => {
+    const filtered = orders.filter(order => {
       // Search filter
       if (filters.searchQuery) {
         const query = filters.searchQuery.toLowerCase();

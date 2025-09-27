@@ -1,5 +1,4 @@
-import * as React from 'react';
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Calendar, DollarSign, Target, TrendingUp, Percent, PieChart, RefreshCw, AlertCircle, Download, Filter } from 'lucide-react';
 import KPICard from '../components/KPICard';
 import DataTable from '../components/DataTable';

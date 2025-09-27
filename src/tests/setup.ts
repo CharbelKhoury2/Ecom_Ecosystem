@@ -80,8 +80,20 @@ Object.defineProperty(window, 'sessionStorage', {
   value: sessionStorageMock,
 });
 
-// Mock fetch
-global.fetch = vi.fn();
+// Mock fetch with proper typing
+interface MockResponse {
+  ok: boolean;
+  status?: number;
+  json: () => Promise<unknown>;
+}
+
+const mockFetch = vi.fn() as vi.MockedFunction<typeof fetch>;
+global.fetch = mockFetch;
+
+// Helper to type the mock fetch
+export const mockFetchResponse = (response: MockResponse) => {
+  (global.fetch as vi.MockedFunction<typeof fetch>).mockResolvedValue(response as Response);
+};
 
 // Mock console methods to reduce noise in tests
 const originalConsoleError = console.error;

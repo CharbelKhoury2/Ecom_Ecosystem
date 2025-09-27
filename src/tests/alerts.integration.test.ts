@@ -71,7 +71,7 @@ describe('Inventory Alerts Integration Tests', () => {
   describe('Full Workflow: Product → Alert → Acknowledge → Restock → Close', () => {
     it('should complete the full inventory alert lifecycle', async () => {
       // Step 1: Run inventory check to generate alert
-      const inventoryResponse = await fetch('/src/api/alerts/inventory', {
+      const inventoryResponse = await fetch('/api/alerts/inventory', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ workspace_id: testWorkspaceId, force: true })
@@ -112,7 +112,7 @@ describe('Inventory Alerts Integration Tests', () => {
       expect(auditLogs[0].target_type).toBe('alert');
 
       // Step 4: Acknowledge the alert
-      const acknowledgeResponse = await fetch(`/src/api/alerts/${testAlertId}/acknowledge`, {
+      const acknowledgeResponse = await fetch(`/api/alerts/${testAlertId}/acknowledge`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ acknowledged_by: 'test@example.com' })
@@ -138,7 +138,7 @@ describe('Inventory Alerts Integration Tests', () => {
 
       // Step 6: Perform mock restock (development only)
       if (process.env.NODE_ENV !== 'production') {
-        const restockResponse = await fetch(`/src/api/alerts/${testAlertId}/mock_restock`, {
+        const restockResponse = await fetch(`/api/alerts/${testAlertId}/mock_restock`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ qty: 20, actor: 'test@example.com' })
@@ -161,7 +161,7 @@ describe('Inventory Alerts Integration Tests', () => {
         expect(updatedProduct.inventory_quantity).toBe(25);
 
         // Step 8: Run inventory check again to auto-close alert
-        const secondCheckResponse = await fetch('/src/api/alerts/inventory', {
+        const secondCheckResponse = await fetch('/api/alerts/inventory', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ workspace_id: testWorkspaceId, force: true })
@@ -204,7 +204,7 @@ describe('Inventory Alerts Integration Tests', () => {
         .eq('id', testProductId);
 
       // Run inventory check
-      const response = await fetch('/src/api/alerts/inventory', {
+      const response = await fetch('/api/alerts/inventory', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ workspace_id: testWorkspaceId, force: true })
@@ -221,7 +221,7 @@ describe('Inventory Alerts Integration Tests', () => {
   describe('Duplicate Alert Prevention', () => {
     it('should not create duplicate alerts for same SKU', async () => {
       // First inventory check
-      const firstResponse = await fetch('/src/api/alerts/inventory', {
+      const firstResponse = await fetch('/api/alerts/inventory', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ workspace_id: testWorkspaceId, force: true })
@@ -231,7 +231,7 @@ describe('Inventory Alerts Integration Tests', () => {
       expect(firstResult.created).toBe(1);
 
       // Second inventory check (should not create duplicate)
-      const secondResponse = await fetch('/src/api/alerts/inventory', {
+      const secondResponse = await fetch('/api/alerts/inventory', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ workspace_id: testWorkspaceId, force: true })
@@ -245,7 +245,7 @@ describe('Inventory Alerts Integration Tests', () => {
 
   describe('Scheduler Integration', () => {
     it('should run scheduler for specific workspace', async () => {
-      const response = await fetch('/src/api/alerts/scheduler', {
+      const response = await fetch('/api/alerts/scheduler', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ manual: true, workspace_id: testWorkspaceId })
@@ -259,7 +259,7 @@ describe('Inventory Alerts Integration Tests', () => {
     });
 
     it('should get scheduler status', async () => {
-      const response = await fetch('/src/api/alerts/scheduler?action=status');
+      const response = await fetch('/api/alerts/scheduler?action=status');
 
       expect(response.ok).toBe(true);
       const result = await response.json();
@@ -278,7 +278,7 @@ describe('Inventory Alerts Integration Tests', () => {
         .eq('id', testProductId);
 
       // Run inventory check
-      const response = await fetch('/src/api/alerts/inventory', {
+      const response = await fetch('/api/alerts/inventory', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ workspace_id: testWorkspaceId, force: true })
@@ -291,7 +291,7 @@ describe('Inventory Alerts Integration Tests', () => {
     });
 
     it('should handle invalid alert ID for acknowledgment', async () => {
-      const response = await fetch('/src/api/alerts/invalid-id/acknowledge', {
+      const response = await fetch('/api/alerts/invalid-id/acknowledge', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ acknowledged_by: 'test@example.com' })
@@ -305,7 +305,7 @@ describe('Inventory Alerts Integration Tests', () => {
 
     it('should handle invalid quantity for mock restock', async () => {
       // First create an alert
-      const inventoryResponse = await fetch('/src/api/alerts/inventory', {
+      const inventoryResponse = await fetch('/api/alerts/inventory', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ workspace_id: testWorkspaceId, force: true })
@@ -315,7 +315,7 @@ describe('Inventory Alerts Integration Tests', () => {
       const alertId = inventoryResult.alerts[0].id;
 
       // Try mock restock with invalid quantity
-      const response = await fetch(`/src/api/alerts/${alertId}/mock_restock`, {
+      const response = await fetch(`/api/alerts/${alertId}/mock_restock`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ qty: -5, actor: 'test@example.com' })
@@ -331,7 +331,7 @@ describe('Inventory Alerts Integration Tests', () => {
   describe('Audit Trail Verification', () => {
     it('should create complete audit trail for alert lifecycle', async () => {
       // Create alert
-      const inventoryResponse = await fetch('/src/api/alerts/inventory', {
+      const inventoryResponse = await fetch('/api/alerts/inventory', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ workspace_id: testWorkspaceId, force: true })
@@ -341,7 +341,7 @@ describe('Inventory Alerts Integration Tests', () => {
       const alertId = inventoryResult.alerts[0].id;
 
       // Acknowledge alert
-      await fetch(`/src/api/alerts/${alertId}/acknowledge`, {
+      await fetch(`/api/alerts/${alertId}/acknowledge`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ acknowledged_by: 'test@example.com' })

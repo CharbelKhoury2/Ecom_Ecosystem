@@ -10,9 +10,10 @@ import ProtectedRoute from './components/ProtectedRoute';
 import LoadingSpinner from './components/LoadingSpinner';
 import ErrorBoundary from './components/ErrorBoundary';
 import { AnimatedPage } from './components/AnimatedComponents';
-import { DiagnosticOverlay } from './components/DiagnosticOverlay';
+
 import { alertNotificationIntegration } from './services/alertNotificationIntegration';
 import { pwaService } from './services/pwaService';
+// import ThemeDebugger from './components/ThemeDebugger';
 
 // Lazy load pages for better performance
 const Dashboard = lazy(() => import('./pages/Dashboard'));
@@ -189,8 +190,8 @@ function AnimatedRoutes() {
 function App() {
   useEffect(() => {
     alertNotificationIntegration.initialize();
-    // Initialize PWA service
-    console.log('PWA Service initialized:', pwaService.getInfo());
+    // PWA service auto-initializes in constructor
+    console.log('PWA Service info:', pwaService.getInfo());
   }, []);
 
   return (
@@ -214,6 +215,7 @@ function App() {
                     border: '1px solid #374151'
                   }
                 }} />
+                {/* <ThemeDebugger /> */}
               </div>
             </Router>
           </AuthProvider>

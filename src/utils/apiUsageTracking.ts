@@ -220,6 +220,17 @@ class APIUsageTracker {
       'X-API-Session-Requests': sessionUsage.requests_count.toString()
     };
   }
+
+  /**
+   * Clear session usage for testing purposes
+   */
+  clearSessionUsage(workspace_id?: string): void {
+    if (workspace_id) {
+      this.sessionUsage.delete(workspace_id);
+    } else {
+      this.sessionUsage.clear();
+    }
+  }
 }
 
 // Singleton instance

@@ -147,7 +147,7 @@ export async function GET(request: Request) {
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(_request: Request) {
   return new Response(
     JSON.stringify({ error: 'Method not allowed' }),
     { status: 405, headers: { 'Content-Type': 'application/json' } }

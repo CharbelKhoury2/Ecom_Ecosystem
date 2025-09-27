@@ -110,15 +110,13 @@ export async function POST(request: Request) {
     const newInventory = currentInventory + qty;
     const currentTime = new Date().toISOString();
 
-    const { data: updatedProduct, error: updateError } = await supabase
+    const { error: updateError } = await supabase
       .from('shopify_products')
       .update({
         inventory_quantity: newInventory,
         updated_at: currentTime
       })
-      .eq('id', product.id)
-      .select('*')
-      .single();
+      .eq('id', product.id);
 
     if (updateError) {
       console.error('Error updating product inventory:', updateError);

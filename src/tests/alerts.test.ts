@@ -66,7 +66,7 @@ describe('Inventory Alerts Logic', () => {
       });
 
       // Mock the inventory API call
-      (global.fetch as any).mockResolvedValue({
+      (global.fetch as vi.MockedFunction<typeof fetch>).mockResolvedValue({
         ok: true,
         json: () => Promise.resolve({
           alerts: [{

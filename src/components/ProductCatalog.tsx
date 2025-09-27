@@ -274,7 +274,7 @@ const ProductCatalog: React.FC = () => {
 
   // Filter and sort products
   const filteredProducts = useMemo(() => {
-    let filtered = products.filter(product => {
+    const filtered = products.filter(product => {
       // Search query filter
       if (searchQuery) {
         const query = searchQuery.toLowerCase();

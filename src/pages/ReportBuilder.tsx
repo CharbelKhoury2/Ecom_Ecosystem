@@ -170,7 +170,7 @@ const ReportBuilder: React.FC = () => {
       });
 
       const response = await apiClient.get(`${currentDataSource.endpoint}?${params.toString()}`);
-      let data = response.data.data || response.data.orders || response.data.products || response.data.campaigns || response.data.alerts || [];
+      const data = response.data.data || response.data.orders || response.data.products || response.data.campaigns || response.data.alerts || [];
 
       // Apply client-side sorting if specified
       if (reportConfig.sortBy) {

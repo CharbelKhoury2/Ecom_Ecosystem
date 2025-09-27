@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { applyTheme, getIsDark, getStoredTheme, watchSystemTheme, toggleTheme as utilToggleTheme } from '../utils/themeUtils';
 
 type Theme = 'light' | 'dark' | 'system';
 
@@ -6,6 +7,8 @@ interface ThemeContextType {
   theme: Theme;
   setTheme: (theme: Theme) => void;
   isDark: boolean;
+  toggleTheme: () => void;
+  systemTheme: boolean;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
@@ -24,55 +27,49 @@ interface ThemeProviderProps {
 
 export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
   const [theme, setTheme] = useState<Theme>(() => {
-    const stored = localStorage.getItem('theme') as Theme;
-    return stored || 'system';
+    if (typeof window === 'undefined') return 'system';
+    return getStoredTheme();
   });
 
-  const [isDark, setIsDark] = useState(false);
+  const [isDark, setIsDark] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return getIsDark(getStoredTheme());
+  });
 
   useEffect(() => {
-    const root = window.document.documentElement;
+    if (typeof window === 'undefined') return;
     
     const updateTheme = () => {
-      let shouldBeDark = false;
-      
-      if (theme === 'dark') {
-        shouldBeDark = true;
-      } else if (theme === 'light') {
-        shouldBeDark = false;
-      } else {
-        // system theme
-        shouldBeDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      }
-      
+      const shouldBeDark = getIsDark(theme);
       setIsDark(shouldBeDark);
-      
-      if (shouldBeDark) {
-        root.classList.add('dark');
-      } else {
-        root.classList.remove('dark');
-      }
+      applyTheme(theme);
     };
 
     updateTheme();
-    localStorage.setItem('theme', theme);
 
     // Listen for system theme changes
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const handleChange = () => {
+    const cleanup = watchSystemTheme(() => {
       if (theme === 'system') {
         updateTheme();
       }
-    };
+    });
 
-    mediaQuery.addEventListener('change', handleChange);
-    return () => mediaQuery.removeEventListener('change', handleChange);
+    return cleanup;
   }, [theme]);
+
+  const toggleTheme = () => {
+    const newTheme = utilToggleTheme(theme);
+    setTheme(newTheme);
+  };
+
+  const systemTheme = theme === 'system';
 
   const value = {
     theme,
     setTheme,
     isDark,
+    toggleTheme,
+    systemTheme,
   };
 
   return (

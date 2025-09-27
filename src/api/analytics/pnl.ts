@@ -82,13 +82,11 @@ export async function GET(request: Request) {
     // Calculate current metrics
     const currentRevenue = currentOrders.reduce((sum, order) => sum + (order.revenue || 0), 0);
     const currentShipping = currentOrders.reduce((sum, order) => sum + (order.shipping_cost || 0), 0);
-    const currentRefunds = currentOrders.reduce((sum, order) => sum + (order.refunds || 0), 0);
     const currentAdSpend = (currentCampaigns || []).reduce((sum, campaign) => sum + (campaign.spend || 0), 0);
 
     // Calculate previous metrics
     const previousRevenue = previousOrders.reduce((sum, order) => sum + (order.revenue || 0), 0);
     const previousShipping = previousOrders.reduce((sum, order) => sum + (order.shipping_cost || 0), 0);
-    const previousRefunds = previousOrders.reduce((sum, order) => sum + (order.refunds || 0), 0);
     const previousAdSpend = (previousCampaigns || []).reduce((sum, campaign) => sum + (campaign.spend || 0), 0);
 
     // Calculate COGS from actual product costs

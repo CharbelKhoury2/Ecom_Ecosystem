@@ -432,7 +432,8 @@ function generateInsights(context: any, query: string) {
 }
 
 // Legacy function for backward compatibility
-async function generateGeminiResponse(
+async function getStoreContext(): Promise<any> {
+  try {
     const campaignMap = new Map();
     campaigns?.forEach(campaign => {
       if (!campaignMap.has(campaign.campaign_id)) {

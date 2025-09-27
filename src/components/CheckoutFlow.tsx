@@ -499,7 +499,7 @@ const CheckoutFlow: React.FC = () => {
         
         <div className="mt-4">
           <h2 className="text-xl font-semibold text-gray-900">
-            {steps[currentStep].title}
+            {steps[currentStep]?.title || ''}
           </h2>
           <p className="text-gray-600">{steps[currentStep].description}</p>
         </div>

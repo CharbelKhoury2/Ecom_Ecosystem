@@ -6,7 +6,9 @@ import { visualizer } from 'rollup-plugin-visualizer'
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [
-    react(),
+    react({
+      jsxRuntime: 'automatic'
+    }),
     // Bundle analyzer (only in build mode)
     process.env.ANALYZE && visualizer({
       filename: 'dist/stats.html',
@@ -27,7 +29,12 @@ export default defineConfig({
     https: false,
     // Optimize dev server
     hmr: {
-      overlay: true
+      overlay: true,
+      port: 5173
+    },
+    // Fix WebSocket connection issues
+    watch: {
+      usePolling: false
     }
   },
   build: {
